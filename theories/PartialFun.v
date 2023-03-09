@@ -1,3 +1,5 @@
+(* Open general recursion library *)
+
 From Equations Require Import Equations.
 From Coq Require Import Utf8 List Arith Lia.
 Import ListNotations.
@@ -9,10 +11,7 @@ Set Universe Polymorphism.
 (* TODOs
 
   - Maybe deal with dependencies the McBride way?
-  - Define a typeclass Prefun which talks about types which have domain,
-    codomain, graph, fueled version, wf version and then have
-    call {C} `{Prefun C} (g : C) (x : predom g) (κ : precod g → orec A B y)
-    + maybe some subclasses to be able to only specify the fueled and/or the wf
+  - Maybe some subclasses to be able to only specify the fueled and/or the wf
     versions.
     + Maybe use a hint with high cost for the default instance to ease override.
   - Make fueled resumable so it can be composed in the continuation to have
@@ -21,8 +20,6 @@ Set Universe Polymorphism.
   - Mutual functions without the need for encoding?
 
 *)
-
-(* Open general recursion library *)
 
 (* A class of true booleans *)
 
@@ -545,11 +542,6 @@ Proof.
   - apply funind_graph.
 Defined.
 
-(* Accessibility from fuel *)
-
-(* Notation autodom :=
-  (). *)
-
 (* Example: Untyped λ-calculus *)
 
 Inductive term : Type :=
@@ -746,7 +738,7 @@ Fail Definition omega_refl : bool := conv_auto tOmega tOmega.
 Compute conv_fuel 1000 t₂ (tVar 2).
 Compute conv_fuel 1000 t₂ (tVar 0).
 
-(* TODO OLD *)
+(* We now wish to use this definition for a class we know to be terminating. *)
 
 Inductive type :=
 | base
@@ -770,8 +762,6 @@ Inductive typing (Γ : context) : term → type → Prop :=
       typing Γ t (arrow A B) →
       typing Γ u A →
       typing Γ (tApp t u) B.
-
-(* We now wish to use this definition for a class we know to be terminating. *)
 
 Definition cored u v :=
   red v u.
