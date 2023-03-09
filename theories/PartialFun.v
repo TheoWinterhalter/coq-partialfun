@@ -495,6 +495,25 @@ Section Lib.
     - intros. eapply H1. assumption.
   Qed.
 
+  (* We deduce the graph case from the above *)
+
+  Lemma funind_graph :
+    ∀ pre post x v,
+      partial_ind pre post →
+      pre x →
+      graph x v →
+      post x v.
+  Proof.
+    intros pre post x v h hpre e.
+    assert (hx : domain x).
+    { eexists. eassumption. }
+    pose proof (def_graph_sound x hx) as hgr.
+    assert (v = def x hx).
+    { eapply orec_graph_functional. all: eassumption. }
+    subst.
+    eapply def_ind. all: eassumption.
+  Qed.
+
 End Lib.
 
 (* We can provide an instance for all partial functions defined as above. *)
