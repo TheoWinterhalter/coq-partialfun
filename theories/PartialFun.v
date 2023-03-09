@@ -285,12 +285,6 @@ Section Lib.
 
   (* Well-founded version *)
 
-  Definition partial_arg :=
-    { x | domain x }.
-
-  Definition partial_arg_lt (x y : partial_arg) :=
-    partial_lt (x ∙1) (y ∙1).
-
   Lemma partial_lt_acc :
     ∀ x,
       domain x →
@@ -315,16 +309,6 @@ Section Lib.
       { eapply pgraph_fun. all: eassumption. }
       subst.
       apply IHh. assumption.
-  Qed.
-
-  Lemma partial_arg_lt_acc :
-    ∀ x, Acc partial_arg_lt x.
-  Proof.
-    intros [x h].
-    pose proof (partial_lt_acc x h) as hacc.
-    induction hacc as [x hacc ih] in h |- *.
-    constructor. intros [y h'] hlt.
-    apply ih. assumption.
   Qed.
 
   Notation sigmaarg :=
