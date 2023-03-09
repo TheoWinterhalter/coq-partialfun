@@ -740,17 +740,6 @@ Inductive typing (Γ : context) : term → type → Prop :=
       typing Γ u A →
       typing Γ (tApp t u) B.
 
-
-(* We can show soundness and stuff *)
-(* Ideally on the open rec version and then automatically lifted to the fuel
-   and def versions.
-*)
-
-
-(* Let's do the same now for the non-fueled version *)
-
-
-
 (* We now wish to use this definition for a class we know to be terminating. *)
 
 Definition cored u v :=
@@ -760,17 +749,3 @@ Axiom SN :
   ∀ Γ t A,
     typing Γ t A →
     Acc cored t.
-
-(* TODO: One of the main challenges is the ability to compose such functions! *)
-(* Otherwise it's kind of useless. *)
-
-(* We have several ways:
-
-  - We use only either the fuel or the wf version and that's that.
-  - We extend the monad to support call to other partial open rec functions.
-
-  We can do that after we make it a lib and test it on a procedure for comparing
-  λ-terms? We have to wonder also wether this A → orec A B can be dependent or
-  not. Probably best if it can be.
-
-*)
