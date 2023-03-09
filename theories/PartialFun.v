@@ -733,7 +733,36 @@ Fail Definition omega_refl : bool := conv_auto tOmega tOmega.
 Compute conv_fuel 1000 t₂ (tVar 2).
 Compute conv_fuel 1000 t₂ (tVar 0).
 
-(* We can also prove properties about conv (TODO) *)
+(* We can also prove properties about conv *)
+
+Definition isconv u v :=
+  ∃ u' v',
+    reds u u' ∧
+    reds v v' ∧
+    eqterm u' v' = true.
+
+Ltac splits :=
+  lazymatch goal with
+  | |- _ ∧ _ => split ; splits
+  | |- _ * _ => split ; splits
+  | |- _ => idtac
+  end.
+
+Lemma conv_sound :
+  funind conv (λ _, True) (λ '(u, v) b, b = true → isconv u v).
+Proof.
+  intros [u v] _. simpl.
+  eexists _, _. splits.
+  1: apply eval_sound.
+  1: simpl ; auto.
+  simpl. intros u' hu.
+  eexists _, _. splits.
+  1: apply eval_sound.
+  1: simpl ; auto.
+  simpl. intros v' hv e.
+  exists u', v'.
+  intuition assumption.
+Qed.
 
 (* We now wish to use this definition for a class we know to be terminating. *)
 
