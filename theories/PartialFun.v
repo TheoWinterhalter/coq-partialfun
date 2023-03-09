@@ -417,7 +417,7 @@ Section Lib.
     | undefined => True
     end.
 
-  Definition partial_ind (pre : precond) post :=
+  Definition funind (pre : precond) post :=
     ∀ x, pre x → orec_ind_step x pre post (f x).
 
   (* The fueled case *)
@@ -445,9 +445,9 @@ Section Lib.
     - discriminate.
   Qed.
 
-  Lemma partial_ind_fuel :
+  Lemma funind_fuel :
     ∀ pre post x n v,
-      partial_ind pre post →
+      funind pre post →
       pre x →
       fueled n x = Success v →
       post x v.
@@ -481,7 +481,7 @@ Section Lib.
 
   Lemma def_ind :
     ∀ pre post x h,
-      partial_ind pre post →
+      funind pre post →
       pre x →
       post x (def x h).
   Proof.
@@ -499,7 +499,7 @@ Section Lib.
 
   Lemma funind_graph :
     ∀ pre post x v,
-      partial_ind pre post →
+      funind pre post →
       pre x →
       graph x v →
       post x v.
@@ -523,13 +523,13 @@ End Lib.
   pgraph := graph f ;
   pfueled := fueled f ;
   pdef := def f ;
-  pfunind := partial_ind f
+  pfunind := funind f
 |}.
 Proof.
   - intros. eapply orec_graph_functional. all: eassumption.
   - apply fueled_graph_sound.
   - apply def_graph_sound.
-  - intros. eapply partial_ind_fuel. all: eassumption.
+  - intros. eapply funind_fuel. all: eassumption.
   - intros. eapply def_ind. all: eassumption.
 Defined.
 
@@ -626,7 +626,7 @@ Definition reds :=
   clos_refl_trans _ red.
 
 Lemma eval_sound :
-  partial_ind oeval (λ _, True) (λ '(t, π) v, reds (zip t π) v).
+  funind oeval (λ _, True) (λ '(t, π) v, reds (zip t π) v).
 Proof.
   intros [t π] _. simpl.
   funelim (open_eval _ _).
@@ -648,7 +648,7 @@ Lemma eval_fuel_sound :
     reds (zip t π) v.
 Proof.
   intros n t π v h.
-  refine (partial_ind_fuel _ _ _ (_,_) _ _ eval_sound _ h).
+  refine (funind_fuel _ _ _ (_,_) _ _ eval_sound _ h).
   constructor.
 Qed.
 
