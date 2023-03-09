@@ -6,6 +6,25 @@ Set Default Goal Selector "!".
 Set Equations Transparent.
 Set Universe Polymorphism.
 
+(* TODOs
+
+  - Maybe deal with dependencies the McBride way?
+  - Define a typeclass Prefun which talks about types which have domain,
+    codomain, graph, fueled version, wf version and then have
+    call {C} `{Prefun C} (g : C) (x : predom g) (κ : precod g → orec A B y)
+    + maybe some subclasses to be able to only specify the fueled and/or the wf
+    versions.
+    + Maybe use a hint with high cost for the default instance to ease override.
+  - Can still do the general version of eval_auto by requiring a proof of = true
+    + can maybe mark this argument implicit and as a class so that we have a
+      hint that tries reflexivity. Termination by: clearly-it-works.
+  - Make fueled resumable so it can be composed in the continuation to have
+    exponential fuel with linear input.
+  - Use the Acc_gen trick for the success_domain stuff.
+  - Mutual functions without the need for encoding?
+
+*)
+
 (* Open general recursion library *)
 
 (* Specific to fuel implementations *)
@@ -661,25 +680,6 @@ Definition t₂ :=
 
 Compute (eval_fuel 1000 t₂ []).
 Definition nf₂ : term := eval_auto t₂ [].
-
-(* TODOs
-
-  - Maybe deal with dependencies the McBride way?
-  - Define a typeclass Prefun which talks about types which have domain,
-    codomain, graph, fueled version, wf version and then have
-    call {C} `{Prefun C} (g : C) (x : predom g) (κ : precod g → orec A B y)
-    + maybe some subclasses to be able to only specify the fueled and/or the wf
-    versions.
-    + Maybe use a hint with high cost for the default instance to ease override.
-  - Can still do the general version of eval_auto by requiring a proof of = true
-    + can maybe mark this argument implicit and as a class so that we have a
-      hint that tries reflexivity. Termination by: clearly-it-works.
-  - Make fueled resumable so it can be composed in the continuation to have
-    exponential fuel with linear input.
-  - Use the Acc_gen trick for the success_domain stuff.
-  - Mutual functions without the need for encoding?
-
-*)
 
 (* Composition test with a conversion checker *)
 
