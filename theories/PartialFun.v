@@ -48,9 +48,6 @@ Arguments Undefined {A}.
 Derive NoConfusion NoConfusionHom for Fueled.
 
 (* Partial function class *)
-(* The class should be about a specific function! Not about the type.
-Otherwise we can't customise instances for some functions.
-*)
 Class PFun {A} (f : A) := {
   psrc : Type ;
   ptgt : psrc → Type ;
@@ -62,14 +59,8 @@ Class PFun {A} (f : A) := {
   pdef : ∀ x, pdomain x → ptgt x ;
   pdef_graph : ∀ x h, pgraph x (pdef x h) ;
   pfunind : (psrc → Prop) → (∀ x, ptgt x → Prop) → Prop ;
-  pfunind_fueled :
-    ∀ φ ψ n x v, pfunind φ ψ → pfueled n x = Success v → φ x → ψ x v ;
-  pfunind_def : ∀ φ ψ x h, pfunind φ ψ → φ x → ψ x (pdef x h)
+  pfunind_graph : ∀ φ ψ x v, pfunind φ ψ → φ x → pgraph x v → ψ x v
 }.
-
-(* TODO: Maybe use pfunind_graph instead of specialising it to fueled and def.
-   Would be the same for the proofs below as well.
-*)
 
 Arguments psrc {A} f {_}.
 Arguments ptgt {A} f {_}.
@@ -81,8 +72,30 @@ Arguments pfueled_graph {A} f {_}.
 Arguments pdef {A} f {_}.
 Arguments pdef_graph {A} f {_}.
 Arguments pfunind {A} f {_}.
-Arguments pfunind_fueled {A} f {_}.
-Arguments pfunind_def {A} f {_}.
+Arguments pfunind_graph {A} f {_}.
+
+Lemma pfunind_fueled :
+  ∀ A f `{PFun A f} φ ψ n x v,
+    pfunind f φ ψ →
+    pfueled f n x = Success v →
+    φ x →
+    ψ x v.
+Proof.
+  intros A f hf φ ψ n x v hfi e hpre.
+  apply pfueled_graph in e.
+  eapply pfunind_graph. all: eassumption.
+Qed.
+
+Lemma pfunind_def :
+  ∀ A f `{PFun A f} φ ψ x h,
+    pfunind f φ ψ →
+    φ x →
+    ψ x (pdef f x h).
+Proof.
+  intros A f hf φ ψ x h hfi hpre.
+  eapply pfunind_graph. 1,2: eassumption.
+  apply pdef_graph.
+Qed.
 
 Inductive orec A B (a : A) :=
 | ret (x : B a)
@@ -529,8 +542,7 @@ Proof.
   - intros. eapply orec_graph_functional. all: eassumption.
   - apply fueled_graph_sound.
   - apply def_graph_sound.
-  - intros. eapply funind_fuel. all: eassumption.
-  - intros. eapply def_ind. all: eassumption.
+  - apply funind_graph.
 Defined.
 
 (* Accessibility from fuel *)
