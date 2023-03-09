@@ -111,7 +111,11 @@ Notation "∇ x , B" :=
 
 Notation "x ← e ;; f" :=
   (e (λ x, f))
-  (at level 100, only parsing).
+  (at level 100, e at next level, right associativity, only parsing).
+
+Notation "' pat ← e ;; f" :=
+  (e (λ x, f))
+  (at level 100, e at next level, right associativity, pat pattern, only parsing).
 
 #[local] Notation "t ∙1" := (proj1_sig t) (at level 20).
 #[local] Notation "⟨ x ⟩" := (exist _ x _) (only parsing).
@@ -709,20 +713,11 @@ Fixpoint eqterm (u v : term) : bool :=
   | _, _ => false
   end.
 
-(* Notation issue. :( *)
-(* Equations conv : ∇ (p : term * term), bool :=
+Equations conv : ∇ (p : term * term), bool :=
   conv (u, v) :=
     u' ← call oeval (u, []) ;;
     v' ← call oeval (v, []) ;;
-    ret (eqterm u' v'). *)
-
-Equations conv : ∇ (p : term * term), bool :=
-  conv (u, v) :=
-    call oeval (u, []) (λ u',
-      call oeval (v, []) (λ v',
-        ret (eqterm u' v')
-      )
-    ).
+    ret (eqterm u' v').
 
 Definition conv_fuel n u v := fueled conv n (u, v).
 Definition conv_def u v := def conv (u, v).
@@ -737,6 +732,8 @@ Fail Definition omega_refl : bool := conv_auto tOmega tOmega.
 
 Compute conv_fuel 1000 t₂ (tVar 2).
 Compute conv_fuel 1000 t₂ (tVar 0).
+
+(* We can also prove properties about conv (TODO) *)
 
 (* We now wish to use this definition for a class we know to be terminating. *)
 
