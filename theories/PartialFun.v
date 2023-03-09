@@ -15,9 +15,6 @@ Set Universe Polymorphism.
     + maybe some subclasses to be able to only specify the fueled and/or the wf
     versions.
     + Maybe use a hint with high cost for the default instance to ease override.
-  - Can still do the general version of eval_auto by requiring a proof of = true
-    + can maybe mark this argument implicit and as a class so that we have a
-      hint that tries reflexivity. Termination by: clearly-it-works.
   - Make fueled resumable so it can be composed in the continuation to have
     exponential fuel with linear input.
   - Use the Acc_gen trick for the success_domain stuff.
@@ -26,6 +23,16 @@ Set Universe Polymorphism.
 *)
 
 (* Open general recursion library *)
+
+(* A class of true booleans *)
+
+Class IsTrue (b : bool) := {
+  is_true : b = true
+}.
+
+#[export] Hint Extern 1 (IsTrue ?b) =>
+  constructor ; reflexivity
+  : typeclass_instances.
 
 (* Specific to fuel implementations *)
 
@@ -407,6 +414,11 @@ Section Lib.
     unfold def. destruct def_p. assumption.
   Qed.
 
+  (* Well-founded version with automatic domain inferrence *)
+
+  Definition autodef (x : A) `{e : IsTrue (succeeds 1000 x)} :=
+    def x (succeeds_domain 1000 x e.(is_true)).
+
   (* Proving properties about such functions *)
 
   Notation precond := (A → Prop).
@@ -648,8 +660,7 @@ Qed.
 
 (* Tests *)
 
-Notation eval_auto t π :=
-  (eval_def t π (succeeds_domain oeval 1000 (t, π) eq_refl)).
+Definition eval_auto t π {e} := autodef oeval (t, π) (e := e).
 
 Definition t₀ :=
   tApp (tLam (tVar 0)) (tLam (tVar 1)).
@@ -709,8 +720,7 @@ Equations conv : ∇ (p : term * term), bool :=
 Definition conv_fuel n u v := fueled conv n (u, v).
 Definition conv_def u v := def conv (u, v).
 
-Notation conv_auto u v :=
-  (conv_def u v (succeeds_domain conv 1000 (u, v) eq_refl)).
+Definition conv_auto u v {e} := autodef conv (u, v) (e := e).
 
 (* We cannot compute the thing below yet, need Acc gen trick *)
 
