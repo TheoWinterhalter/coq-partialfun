@@ -528,6 +528,41 @@ Section Lib.
     eapply def_ind. all: eassumption.
   Qed.
 
+  (* Computing the domain, easier than using the graph *)
+
+  Fixpoint comp_domain {a} (o : orec A B a) :=
+    match o with
+    | ret v => True
+    | rec x κ => domain x ∧ ∀ v, graph x v → comp_domain (κ v)
+    | call g x κ => pdomain g x ∧ ∀ v, pgraph g x v → comp_domain (κ v)
+    | undefined => False
+    end.
+
+  Lemma comp_domain_orec_domain :
+    ∀ a (o : orec A B a),
+      comp_domain o →
+      orec_domain o.
+  Proof.
+    intros a o h.
+    induction o as [w | x κ ih | G g hg x κ ih |] in h |- *.
+    - eexists. constructor.
+    - simpl in h. destruct h as [[v hx] hκ].
+      specialize (hκ v hx). apply ih in hκ. destruct hκ as [w h].
+      eexists. econstructor. all: eassumption.
+    - simpl in h. destruct h as [[v hx] hκ].
+      specialize (hκ v hx). apply ih in hκ. destruct hκ as [w h].
+      eexists. econstructor. all: eassumption.
+    - contradiction.
+  Qed.
+
+  Lemma compute_domain :
+    ∀ x,
+      comp_domain (f x) →
+      domain x.
+  Proof.
+    intro x. apply comp_domain_orec_domain.
+  Qed.
+
 End Lib.
 
 (* We can provide an instance for all partial functions defined as above. *)
