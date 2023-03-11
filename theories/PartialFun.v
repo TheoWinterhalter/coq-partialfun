@@ -546,6 +546,37 @@ Proof.
   - apply funind_graph.
 Defined.
 
+(* Handy notation for autodef *)
+Notation "f @ x" := (autodef f x) (at level 10).
+
+(* Small examples *)
+
+Equations div : ∇ (p : nat * nat), nat :=
+  div (0, m) := ret 0 ;
+  div (n, m) := q ← rec (n - m, m) ;; ret (S q).
+
+Equations test_div : ∇ (p : nat * nat), bool :=
+  test_div (n, m) := q ← call div (n, m) ;; ret (q * m =? n).
+
+Definition div_10_5 := div @ (10, 5).
+Fail Definition div_10_0 := div @ (10, 0).
+
+Lemma div_below :
+  funind div
+    (λ '(n, m), n < m)
+    (λ '(n, m) q, match n with 0 => q = 0 | _ => q = 1 end).
+Proof.
+  intros [n m] h.
+  funelim (div (n, m)).
+  all: cbn - ["-"].
+  - reflexivity.
+  - split.
+    + lia.
+    + intros q hq.
+      replace (S n - m) with 0 in hq by lia.
+      lia.
+Qed.
+
 (* Example: Untyped λ-calculus *)
 
 Inductive term : Type :=
