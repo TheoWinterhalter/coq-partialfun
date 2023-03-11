@@ -612,6 +612,31 @@ Proof.
       lia.
 Qed.
 
+Lemma div_domain :
+  ∀ n m,
+    m ≠ 0 →
+    domain div (n, m).
+Proof.
+  intros n m hm.
+  assert (hw : WellFounded lt).
+  { exact _. }
+  specialize (hw n). induction hw as [n hn ih].
+  apply compute_domain. funelim (div (n, m)). all: cbn - ["-"].
+  - constructor.
+  - intuition auto. apply ih. lia.
+Qed.
+
+Lemma test_div_domain :
+  ∀ n m,
+    m ≠ 0 →
+    domain test_div (n, m).
+Proof.
+  intros n m hm.
+  apply compute_domain. simpl.
+  intuition auto.
+  apply div_domain. assumption.
+Qed.
+
 (* Example: Untyped λ-calculus *)
 
 Inductive term : Type :=
