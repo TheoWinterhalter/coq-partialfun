@@ -626,6 +626,21 @@ Proof.
   - intuition auto. apply ih. lia.
 Qed.
 
+Lemma div_domain_implies :
+  ∀ n m,
+    domain div (n, m) →
+    n = 0 ∨ m ≠ 0.
+Proof.
+  assert (h : funind div (λ _, True) (λ '(n, m) _, n = 0 ∨ m ≠ 0)).
+  { intros [n m] _.
+    funelim (div (n, m)). all: cbn - ["-"].
+    - left. reflexivity.
+    - intuition lia.
+  }
+  intros n m [v hd].
+  refine (funind_graph _ _ _ (_,_) _ h _ _). all: eauto.
+Qed.
+
 Lemma test_div_domain :
   ∀ n m,
     m ≠ 0 →
