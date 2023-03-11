@@ -614,7 +614,7 @@ Qed.
 
 Lemma div_domain :
   ∀ n m,
-    m ≠ 0 →
+    (n = 0 ∨ m ≠ 0) →
     domain div (n, m).
 Proof.
   intros n m hm.
@@ -623,7 +623,8 @@ Proof.
   specialize (hw n). induction hw as [n hn ih].
   apply compute_domain. funelim (div (n, m)). all: cbn - ["-"].
   - constructor.
-  - intuition auto. apply ih. lia.
+  - split. 2: auto.
+    apply ih. all: lia.
 Qed.
 
 Lemma div_domain_implies :
@@ -643,12 +644,12 @@ Qed.
 
 Lemma test_div_domain :
   ∀ n m,
-    m ≠ 0 →
+    (n = 0 ∨ m ≠ 0) →
     domain test_div (n, m).
 Proof.
   intros n m hm.
   apply compute_domain. simpl.
-  intuition auto.
+  split. 2: auto.
   apply div_domain. assumption.
 Qed.
 
