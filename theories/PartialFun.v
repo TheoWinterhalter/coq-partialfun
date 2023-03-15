@@ -944,10 +944,10 @@ Inductive typing (Γ : context) : term → type → Prop :=
 Definition cored u v :=
   red v u.
 
-Axiom SN :
-  ∀ Γ t A,
-    typing Γ t A →
-    Acc cored t.
+(* A term is strongly normalising when all its reduction paths are finite *)
+Definition SN (t : term) := Acc cored t.
+
+(* We could prove that all well-typed terms are SN. *)
 
 (* We also need the subterm relation (or a subset of it) *)
 
@@ -1038,13 +1038,12 @@ Proof.
   apply right_lex_eq. all: eauto.
 Qed.
 
-Lemma welltyped_eval :
-  ∀ Γ t π A,
-    typing Γ (zip t π) A →
+Lemma SN_eval_domain :
+  ∀ t π,
+    SN (zip t π) →
     domain eval (t, π).
 Proof.
-  intros Γ t π A h.
-  eapply SN in h. clear Γ A.
+  intros t π h.
   eapply R_acc in h.
   set (z := (t, π)) in *. clearbody z.
   induction h as [z h ih].
