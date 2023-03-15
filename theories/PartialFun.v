@@ -10,7 +10,6 @@ Set Universe Polymorphism.
 
 (* TODOs
 
-  - Maybe deal with dependencies the McBride way?
   - Maybe some subclasses to be able to only specify the fueled and/or the wf
     versions.
     + Maybe use a hint with high cost for the default instance to ease override.
@@ -94,20 +93,24 @@ Proof.
   apply pdef_graph.
 Qed.
 
-Inductive orec A B (a : A) :=
-| ret (x : B a)
-| rec (x : A) (κ : B x → orec A B a)
-| call F f `{hf : PFun F f} (x : psrc f) (κ : ptgt f x → orec A B a)
+Inductive orec A B C :=
+| ret (x : C)
+| rec (x : A) (κ : B x → orec A B C)
+| call F f `{hf : PFun F f} (x : psrc f) (κ : ptgt f x → orec A B C)
 | undefined.
 
-Arguments ret {A B a}.
-Arguments rec {A B a}.
-Arguments call {A B a F} f {hf}.
-Arguments undefined {A B a}.
+Arguments ret {A B C}.
+Arguments rec {A B C}.
+Arguments call {A B C F} f {hf}.
+Arguments undefined {A B C}.
 
 Notation "∇ x , B" :=
-  (∀ x, orec _ (λ x, B) x)
+  (∀ x, orec _ (λ x, B) B)
   (x binder, at level 200).
+
+Notation "A ⇀ B" :=
+  (∇ (_ : A), B)
+  (at level 199).
 
 Notation "x ← e ;; f" :=
   (e (λ x, f))
@@ -125,7 +128,7 @@ Section Lib.
 
   Context {A B} (f : ∇ (x : A), B x).
 
-  Inductive orec_graph {a} : orec A B a → B a → Prop :=
+  Inductive orec_graph {a} : orec A B (B a) → B a → Prop :=
   | ret_graph :
       ∀ x,
         orec_graph (ret x) x
@@ -145,7 +148,7 @@ Section Lib.
   Definition graph x v :=
     orec_graph (f x) v.
 
-  Inductive orec_lt {a} : A → orec A B a → Prop :=
+  Inductive orec_lt {a} : A → orec A B (B a) → Prop :=
   | top_lt :
       ∀ x κ,
         orec_lt x (rec x κ)
@@ -218,7 +221,7 @@ Section Lib.
 
   (* Fuel version *)
 
-  Fixpoint orec_fuel_inst {a} n (e : orec A B a) (r : ∀ x, Fueled (B x)) :=
+  Fixpoint orec_fuel_inst {a} n (e : orec A B (B a)) (r : ∀ x, Fueled (B x)) :=
     match e with
     | ret v => Success v
     | rec x κ =>
@@ -245,7 +248,7 @@ Section Lib.
   (* We show the fueled version is sound with respect to the graph *)
 
   Lemma orec_fuel_inst_graph :
-    ∀ a n (o : orec _ _ a) r v,
+    ∀ a n (o : orec _ _ (_ a)) r v,
       orec_fuel_inst n o r = Success v →
       (∀ x w, r x = Success w → graph x w) →
       orec_graph o v.
@@ -341,13 +344,13 @@ Section Lib.
   Definition image x :=
     { v | graph x v }.
 
-  Definition oimage {a} (o : orec A B a) :=
+  Definition oimage {a} (o : orec A B (B a)) :=
     { v | orec_graph o v }.
 
-  Definition orec_domain {a} (o : orec A B a) :=
+  Definition orec_domain {a} (o : orec A B (B a)) :=
     ∃ v, orec_graph o v.
 
-  Equations? orec_inst {a} (e : orec A B a) (de : orec_domain e)
+  Equations? orec_inst {a} (e : orec A B (B a)) (de : orec_domain e)
     (da : domain a)
     (ha : ∀ x, orec_lt x e → partial_lt x a)
     (r : ∀ y, domain y → partial_lt y a → image y) : oimage e :=
@@ -539,7 +542,7 @@ Section Lib.
     end.
 
   Lemma comp_domain_orec_domain :
-    ∀ a (o : orec A B a),
+    ∀ a (o : orec A B (B a)),
       comp_domain o →
       orec_domain o.
   Proof.
@@ -700,12 +703,12 @@ Fail Equations eval (u : term) (π : stack) : term :=
   eval (tLam t) π := eval t (sLam π) ;
   eval (tApp u v) π := eval u (sApp v π).
 
-(* It's a shame we need all those annotations! *)
-Equations eval : ∇ (p : term * stack), term :=
+(* Notice the partial arrow "⇀" *)
+Equations eval : term * stack ⇀ term :=
   eval (tVar n, π) := ret (zip (tVar n) π) ;
-  eval (tLam t, sApp u π) := v ← rec (subst t u, π) ;; ret (B := λ _, term) (a := (tLam t, sApp u π)) v ;
-  eval (tLam t, π) := v ← rec (t, sLam π) ;; ret (B := λ _, term) (a := (tLam t, π)) v ;
-  eval (tApp u v, π) := w ← rec (u, sApp v π) ;; ret (B := λ _, term) (a := (tApp u v, π)) w.
+  eval (tLam t, sApp u π) := v ← rec (subst t u, π) ;; ret v ;
+  eval (tLam t, π) := v ← rec (t, sLam π) ;; ret v ;
+  eval (tApp u v, π) := w ← rec (u, sApp v π) ;; ret w.
 
 (* We get the fueled and wf versions for free *)
 
