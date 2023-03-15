@@ -19,6 +19,11 @@ Set Universe Polymorphism.
 
 *)
 
+(* Parameters *)
+
+#[local] Notation default_fuel := 1000.
+#[local] Notation acc_fuel := default_fuel.
+
 (* A class of true booleans *)
 
 Class IsTrue (b : bool) := {
@@ -333,7 +338,7 @@ Section Lib.
   #[local] Instance wf_partial :
     WellFounded (λ (x y : sigmaarg), partial_lt (pr1 x) (pr1 y)).
   Proof.
-    eapply Acc_intro_generator with (1 := 1000).
+    eapply Acc_intro_generator with (1 := acc_fuel).
     intros [x h].
     pose proof (partial_lt_acc x h) as hacc.
     induction hacc as [x hacc ih] in h |- *.
@@ -420,8 +425,8 @@ Section Lib.
 
   (* Well-founded version with automatic domain inferrence *)
 
-  Definition autodef (x : A) `{e : IsTrue (succeeds 1000 x)} :=
-    def x (succeeds_domain 1000 x e.(is_true)).
+  Definition autodef (x : A) `{e : IsTrue (succeeds default_fuel x)} :=
+    def x (succeeds_domain default_fuel x e.(is_true)).
 
   (* Proving properties about such functions *)
 
