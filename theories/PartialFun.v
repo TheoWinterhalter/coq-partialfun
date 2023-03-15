@@ -15,7 +15,6 @@ Set Universe Polymorphism.
     + Maybe use a hint with high cost for the default instance to ease override.
   - Make fueled resumable so it can be composed in the continuation to have
     exponential fuel with linear input.
-  - Use the Acc_gen trick for the success_domain stuff.
   - Mutual functions without the need for encoding?
 
 *)
@@ -334,12 +333,16 @@ Section Lib.
   #[local] Instance wf_partial :
     WellFounded (λ (x y : sigmaarg), partial_lt (pr1 x) (pr1 y)).
   Proof.
+    eapply Acc_intro_generator with (1 := 1000).
     intros [x h].
     pose proof (partial_lt_acc x h) as hacc.
     induction hacc as [x hacc ih] in h |- *.
     constructor. intros [y h'] hlt.
     apply ih. assumption.
-  Qed.
+  Defined.
+
+  (* We need this for the proofs to go through *)
+  Opaque wf_partial.
 
   Definition image x :=
     { v | graph x v }.
@@ -566,6 +569,9 @@ Section Lib.
     intro x. apply comp_domain_orec_domain.
   Qed.
 
+  (* Now we can let it compute *)
+  Transparent wf_partial.
+
 End Lib.
 
 (* We can provide an instance for all partial functions defined as above. *)
@@ -598,6 +604,8 @@ Equations test_div : ∇ (p : nat * nat), bool :=
 
 Definition div_10_5 := div @ (10, 5).
 Fail Definition div_10_0 := div @ (10, 0).
+
+Compute div @ (50,6).
 
 Lemma div_below :
   funind div
@@ -823,6 +831,7 @@ Definition t₀ :=
 
 Compute (eval_fuel 1000 t₀ sNil).
 Definition nf₀ : term := eval @ (t₀, sNil).
+Compute nf₀.
 
 Definition t₁ :=
   tLam t₀.
