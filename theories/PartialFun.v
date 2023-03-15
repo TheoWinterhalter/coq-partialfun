@@ -681,35 +681,37 @@ Fixpoint substk k t u :=
 
 Notation subst t u := (substk 0 t u).
 
-Definition stack := list term.
+Inductive stack :=
+| sApp (u : term) (π : stack)
+| sLam (π : stack)
+| sNil.
 
 Fixpoint zip t π :=
   match π with
-  | u :: π => zip (tApp t u) π
-  | [] => t
+  | sApp u π => zip (tApp t u) π
+  | sLam π => zip (tLam t) π
+  | sNil => t
   end.
 
 (* What we want *)
-(* Fail Equations eval (u : term) (π : stack) : term :=
+Fail Equations eval (u : term) (π : stack) : term :=
   eval (tVar n) π := zip (tVar n) π ;
-  eval (tLam t) (u :: π) := eval (subst t u) π ;
-  eval (tLam t) [] := tLam (eval t []) ;
-  eval (tApp u v) π := eval u (v :: π). *)
+  eval (tLam t) (sApp u π) := eval (subst t u) π ;
+  eval (tLam t) π := eval t (sLam π) ;
+  eval (tApp u v) π := eval u (sApp v π).
 
 (* It's a shame we need all those annotations! *)
-Equations open_eval (u : term) (π : stack) : orec (term * stack) (λ _, term) (u,π) :=
-  open_eval (tVar n) π := ret (zip (tVar n) π) ;
-  open_eval (tLam t) (u :: π) := v ← rec (a := (tLam t, u :: π)) ((subst t u), π) ;; ret (B := λ _, term) (a := (tLam t, u :: π)) v ;
-  open_eval (tLam t) [] := v ← rec (t, []) ;; ret (tLam v) ;
-  open_eval (tApp u v) π := w ← rec (u, v :: π) ;; ret (B := λ _, term) (a := (tApp u v, π)) w.
-
-Definition oeval := λ '(t, π), open_eval t π.
+Equations eval : ∇ (p : term * stack), term :=
+  eval (tVar n, π) := ret (zip (tVar n) π) ;
+  eval (tLam t, sApp u π) := v ← rec (subst t u, π) ;; ret (B := λ _, term) (a := (tLam t, sApp u π)) v ;
+  eval (tLam t, π) := v ← rec (t, sLam π) ;; ret (B := λ _, term) (a := (tLam t, π)) v ;
+  eval (tApp u v, π) := w ← rec (u, sApp v π) ;; ret (B := λ _, term) (a := (tApp u v, π)) w.
 
 (* We get the fueled and wf versions for free *)
 
-Definition eval_fuel n t π := fueled oeval n (t, π).
+Definition eval_fuel n t π := fueled eval n (t, π).
 
-Definition eval_def t π := def oeval (t, π).
+Definition eval_def t π := def eval (t, π).
 
 (* Extraction eval_def. *)
 
@@ -740,22 +742,57 @@ Import Relation_Operators Relation_Definitions.
 Definition reds :=
   clos_refl_trans _ red.
 
-Lemma eval_sound :
-  funind oeval (λ _, True) (λ '(t, π) v, reds (zip t π) v).
+Lemma reds_trans :
+  ∀ u v w,
+    reds u v →
+    reds v w →
+    reds u w.
 Proof.
-  intros [t π] _. simpl.
-  funelim (open_eval _ _).
-  all: simp open_eval.
+  apply rt_trans.
+Qed.
+
+Lemma red_zip :
+  ∀ u v π,
+    red u v →
+    red (zip u π) (zip v π).
+Proof.
+  intros u v π h.
+  induction π as [w π ih | π ih |] in u, v, h |- *.
+  - simpl. eapply ih. constructor. assumption.
+  - simpl. eapply ih. constructor. assumption.
+  - simpl. assumption.
+Qed.
+
+Lemma reds_zip :
+  ∀ u v π,
+    reds u v →
+    reds (zip u π) (zip v π).
+Proof.
+  intros u v π h.
+  induction h as [u v h | u | u v w h1 ih1 h2 ih2] in π |- *.
+  - constructor. apply red_zip. assumption.
+  - apply rt_refl.
+  - eapply rt_trans.
+    + eapply ih1.
+    + eapply ih2.
+Qed.
+
+Lemma eval_sound :
+  funind eval (λ _, True) (λ '(t, π) v, reds (zip t π) v).
+Proof.
+  intros [t π] _. funelim (eval (_, _)).
   all: simpl.
   - apply rt_refl.
   - split. 1: constructor.
     intros v h.
-    admit. (* True but boring *)
+    eapply reds_trans. 2: eassumption.
+    eapply reds_zip. constructor. constructor.
   - split. 1: constructor.
-    intros v h.
-    admit. (* True but boring *)
+    intros v h. assumption.
   - intuition assumption.
-Admitted.
+  - split. 1: constructor.
+    intros w h. assumption.
+Qed.
 
 Lemma eval_fuel_sound :
   ∀ n t π v,
@@ -778,37 +815,35 @@ Qed.
 
 (* Tests *)
 
-Definition eval_auto t π {e} := autodef oeval (t, π) (e := e).
-
 Definition t₀ :=
   tApp (tLam (tVar 0)) (tLam (tVar 1)).
 
-Compute (eval_fuel 1000 t₀ []).
-Definition nf₀ : term := eval_auto t₀ [].
+Compute (eval_fuel 1000 t₀ sNil).
+Definition nf₀ : term := eval @ (t₀, sNil).
 
 Definition t₁ :=
   tLam t₀.
 
-Compute (eval_fuel 1000 t₁ []).
-Definition nf₁ : term := eval_auto t₁ [].
+Compute (eval_fuel 1000 t₁ sNil).
+Definition nf₁ : term := eval @ (t₁, sNil).
 
 Definition tDelta :=
   tLam (tApp (tVar 0) (tVar 0)).
 
-Compute (eval_fuel 1000 tDelta []).
-Definition nfDela : term := eval_auto tDelta [].
+Compute (eval_fuel 1000 tDelta sNil).
+Definition nfDela : term := eval @ (tDelta, sNil).
 
 Definition tOmega :=
   tApp tDelta tDelta.
 
-Compute (eval_fuel 1000 tOmega []).
-Fail Definition nfOmega : term := eval_auto tOmega [].
+Compute (eval_fuel 1000 tOmega sNil).
+Fail Definition nfOmega : term := eval @ (tOmega, sNil).
 
 Definition t₂ :=
   tApp (tApp t₁ (tVar 2)) tOmega.
 
-Compute (eval_fuel 1000 t₂ []).
-Definition nf₂ : term := eval_auto t₂ [].
+Compute (eval_fuel 1000 t₂ sNil).
+Definition nf₂ : term := eval @ (t₂, sNil).
 
 (* Composition test with a conversion checker *)
 
@@ -822,20 +857,18 @@ Fixpoint eqterm (u v : term) : bool :=
 
 Equations conv : ∇ (p : term * term), bool :=
   conv (u, v) :=
-    u' ← call oeval (u, []) ;;
-    v' ← call oeval (v, []) ;;
+    u' ← call eval (u, sNil) ;;
+    v' ← call eval (v, sNil) ;;
     ret (eqterm u' v').
 
 Definition conv_fuel n u v := fueled conv n (u, v).
 Definition conv_def u v := def conv (u, v).
 
-Definition conv_auto u v {e} := autodef conv (u, v) (e := e).
-
 (* We cannot compute the thing below yet, need Acc gen trick *)
 
-Definition delta_refl : bool := conv_auto tDelta tDelta.
+Definition delta_refl : bool := conv @ (tDelta, tDelta).
 
-Fail Definition omega_refl : bool := conv_auto tOmega tOmega.
+Fail Definition omega_refl : bool := conv @ (tOmega, tOmega).
 
 Compute conv_fuel 1000 t₂ (tVar 2).
 Compute conv_fuel 1000 t₂ (tVar 0).
@@ -903,3 +936,116 @@ Axiom SN :
   ∀ Γ t A,
     typing Γ t A →
     Acc cored t.
+
+(* We also need the subterm relation (or a subset of it) *)
+
+Inductive subterm : term → term → Prop :=
+| subterm_lam : ∀ t, subterm t (tLam t)
+| subterm_app : ∀ u v, subterm u (tApp u v).
+
+Derive Signature for subterm.
+Derive NoConfusion NoConfusionHom for term.
+
+Lemma subterm_wf :
+  well_founded subterm.
+Proof.
+  intros t.
+  induction t as [n | t ih | u ihu v ihv].
+  - constructor. intros t h. depelim h.
+  - constructor. intros t' h. depelim h. assumption.
+  - constructor. intros t h. depelim h. assumption.
+Qed.
+
+Definition lex {A B} (leA : A → A → Prop) (leB : B → B → Prop) :=
+  lexprod leA (λ _, leB).
+
+Notation "( u ; v )" := (existT _ u v).
+
+Lemma lex_acc :
+  ∀ A B leA leB x y,
+    @Acc A leA x →
+    @well_founded B leB →
+    Acc (lex leA leB) (x ; y).
+Proof.
+  intros A B leA leB x y hA hB.
+  eapply Lexicographic_Product.acc_A_B_lexprod. all: eauto.
+Qed.
+
+Definition R_aux :=
+  lex cored subterm.
+
+Definition R x y :=
+  let u := fst x in
+  let π := snd x in
+  let v := fst y in
+  let ρ := snd y in
+  R_aux (zip u π ; u) (zip v ρ ; v).
+
+Lemma R_acc :
+  ∀ t π,
+    Acc cored (zip t π) →
+    Acc R (t, π).
+Proof.
+  intros t π h.
+  eapply lex_acc with (y := t) (leB := subterm) in h. 2: eapply subterm_wf.
+  remember (zip t π ; t) as z eqn:e.
+  induction h as [z h ih] in t, π, e |- *. subst.
+  constructor. intros [v ρ] hr.
+  red in hr. red in hr. simpl in hr.
+  eapply ih. 2: reflexivity.
+  assumption.
+Qed.
+
+Lemma R_left :
+  ∀ u v π ρ,
+    red (zip v ρ) (zip u π) →
+    R (u, π) (v, ρ).
+Proof.
+  intros u v π ρ h.
+  apply left_lex. red. assumption.
+Qed.
+
+Lemma right_lex_eq :
+  ∀ A B (leA : A → A → Prop) (leB : B → B → Prop) a a' b b',
+    a = a' →
+    leB b b' →
+    lex leA leB (a ; b) (a' ; b').
+Proof.
+  intros A B leA leB a a' b b' e h.
+  subst a'.
+  apply right_lex. assumption.
+Qed.
+
+Lemma R_right :
+  ∀ u v π ρ,
+    zip u π = zip v ρ →
+    subterm u v →
+    R (u, π) (v, ρ).
+Proof.
+  intros u v π ρ e h.
+  apply right_lex_eq. all: eauto.
+Qed.
+
+Lemma welltyped_eval :
+  ∀ Γ t π A,
+    typing Γ (zip t π) A →
+    domain eval (t, π).
+Proof.
+  intros Γ t π A h.
+  eapply SN in h. clear Γ A.
+  eapply R_acc in h.
+  set (z := (t, π)) in *. clearbody z.
+  induction h as [z h ih].
+  apply compute_domain. funelim (eval z).
+  all: simpl.
+  2-5: split ; [| auto].
+  - auto.
+  - apply ih. apply R_left. simpl.
+    apply red_zip. constructor.
+  - apply ih. apply R_right. 1: reflexivity.
+    constructor.
+  - apply ih. apply R_right. 1: reflexivity.
+    constructor.
+  - apply ih. apply R_right. 1: reflexivity.
+    constructor.
+Qed.
