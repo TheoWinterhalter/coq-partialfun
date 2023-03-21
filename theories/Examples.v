@@ -1,7 +1,13 @@
 From Equations Require Import Equations.
 From Coq Require Import Utf8 List Arith Lia.
-Import ListNotations.
 From PartialFun Require Import PartialFun.
+
+Import ListNotations.
+
+Set Default Goal Selector "!".
+Set Equations Transparent.
+Set Universe Polymorphism.
+
 (* Small examples *)
 
 Equations div : ∇ (p : nat * nat), nat :=
