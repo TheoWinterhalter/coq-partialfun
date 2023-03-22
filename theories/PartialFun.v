@@ -16,6 +16,9 @@ Set Universe Polymorphism.
   - Make fueled resumable so it can be composed in the continuation to have
     exponential fuel with linear input.
   - Mutual functions without the need for encoding?
+  - Better support for monads by having orec be a monad transformer?
+  - Allow the user to write call or rec without a ret clause with nicer
+    notations?
 
 *)
 
