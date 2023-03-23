@@ -1,8 +1,9 @@
 From Equations Require Import Equations.
 From Coq Require Import Utf8 List Arith Lia.
-From PartialFun Require Import PartialFun.
+From PartialFun Require Import PartialFun Monad.
 
 Import ListNotations.
+Import MonadNotations.
 
 Set Default Goal Selector "!".
 Set Equations Transparent.
@@ -12,7 +13,7 @@ Set Universe Polymorphism.
 
 Equations div : ∇ (p : nat * nat), nat :=
   div (0, m) := ret 0 ;
-  div (n, m) := q ← rec (n - m, m) ;; ret (S q).
+  div (n, m) := S <*> rec (n - m, m).
 
 Equations test_div : ∇ (p : nat * nat), bool :=
   test_div (n, m) := q ← call div (n, m) ;; ret (q * m =? n).
@@ -129,9 +130,9 @@ Fail Equations eval (u : term) (π : stack) : term :=
 (* Notice the partial arrow "⇀" *)
 Equations eval : term * stack ⇀ term :=
   eval (tVar n, π) := ret (zip (tVar n) π) ;
-  eval (tLam t, sApp u π) := v ← rec (subst t u, π) ;; ret v ;
-  eval (tLam t, π) := v ← rec (t, sLam π) ;; ret v ;
-  eval (tApp u v, π) := w ← rec (u, sApp v π) ;; ret w.
+  eval (tLam t, sApp u π) := rec (subst t u, π) ;
+  eval (tLam t, π) := rec (t, sLam π) ;
+  eval (tApp u v, π) := rec (u, sApp v π).
 
 (* We get the fueled and wf versions for free *)
 
