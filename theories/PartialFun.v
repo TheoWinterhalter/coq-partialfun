@@ -61,9 +61,7 @@ Class PFun {A} (f : A) := {
   pfueled : nat → ∀ x, Fueled (ptgt x) ;
   pfueled_graph : ∀ n x v, pfueled n x = Success v → pgraph x v ;
   pdef : ∀ x, pdomain x → ptgt x ;
-  pdef_graph : ∀ x h, pgraph x (pdef x h) ;
-  pfunind : (psrc → Prop) → (∀ x, ptgt x → Prop) → Prop ;
-  pfunind_graph : ∀ φ ψ x v, pfunind φ ψ → φ x → pgraph x v → ψ x v
+  pdef_graph : ∀ x h, pgraph x (pdef x h)
 }.
 
 Arguments psrc {A} f {_}.
@@ -75,31 +73,6 @@ Arguments pfueled {A} f {_}.
 Arguments pfueled_graph {A} f {_}.
 Arguments pdef {A} f {_}.
 Arguments pdef_graph {A} f {_}.
-Arguments pfunind {A} f {_}.
-Arguments pfunind_graph {A} f {_}.
-
-Lemma pfunind_fueled :
-  ∀ A f `{PFun A f} φ ψ n x v,
-    pfunind f φ ψ →
-    pfueled f n x = Success v →
-    φ x →
-    ψ x v.
-Proof.
-  intros A f hf φ ψ n x v hfi e hpre.
-  apply pfueled_graph in e.
-  eapply pfunind_graph. all: eassumption.
-Qed.
-
-Lemma pfunind_def :
-  ∀ A f `{PFun A f} φ ψ x h,
-    pfunind f φ ψ →
-    φ x →
-    ψ x (pdef f x h).
-Proof.
-  intros A f hf φ ψ x h hfi hpre.
-  eapply pfunind_graph. 1,2: eassumption.
-  apply pdef_graph.
-Qed.
 
 Inductive orec A B C :=
 | _ret (x : C)
@@ -441,8 +414,7 @@ Section Lib.
     match o with
     | _ret v => post a v
     | _rec x κ => pre x ∧ ∀ v, post x v → orec_ind_step a pre post (κ v)
-    | _call g x κ =>
-        ∃ φ ψ, pfunind g φ ψ ∧ φ x ∧ ∀ v, ψ x v → orec_ind_step a pre post (κ v)
+    | _call g x κ => ∀ v, pgraph g x v → orec_ind_step a pre post (κ v)
     | undefined => True
     end.
 
@@ -469,8 +441,7 @@ Section Lib.
     - simpl in *.
       destruct pfueled as [w | |] eqn:e'. 2,3: discriminate.
       eapply ih. 2: eassumption.
-      destruct h as [φ [ψ [hig [hx hκ]]]].
-      apply hκ. eapply pfunind_fueled. all: eassumption.
+      apply h. eapply pfueled_graph. eassumption.
     - discriminate.
   Qed.
 
@@ -502,9 +473,7 @@ Section Lib.
     - simpl in ho. simp orec_inst. simpl.
       apply ih. apply ho. apply hr. apply ho.
     - simpl in ho. simp orec_inst. simpl.
-      apply ih.
-      destruct ho as [φ [ψ [hig [hx hκ]]]].
-      apply hκ. eapply pfunind_def. all: eassumption.
+      apply ih. eapply ho. apply pdef_graph.
     - destruct hdo as [? h]. depelim h.
   Qed.
 
@@ -589,14 +558,12 @@ End Lib.
   ptgt := B ;
   pgraph := graph f ;
   pfueled := fueled f ;
-  pdef := def f ;
-  pfunind := funind f
+  pdef := def f
 |}.
 Proof.
   - intros. eapply orec_graph_functional. all: eassumption.
   - apply fueled_graph_sound.
   - apply def_graph_sound.
-  - apply funind_graph.
 Defined.
 
 (* Handy notation for autodef *)
@@ -614,3 +581,19 @@ Definition rec {A B} (x : A) : orec A B (B x) :=
 
 Definition call {A B} {F} f `{PFun F f} (x : psrc f) : orec A B (ptgt f x) :=
   _call f x (λ y, ret y).
+
+(* Useful tactics *)
+
+Tactic Notation "funind" constr(p) "in" hyp(h) :=
+  lazymatch type of h with
+  | graph ?f ?x ?v =>
+    eapply funind_graph with (1 := p) in h ; [| try (exact I)]
+  | _ => fail "Hypothesis should be about graph"
+  end.
+
+Tactic Notation "funind" constr(p) "in" hyp(h) "as" ident(na) :=
+  lazymatch type of h with
+  | graph ?f ?x ?v =>
+    eapply funind_graph with (1 := p) in h as na ; [| try (exact I)]
+  | _ => fail "Hypothesis should be about graph"
+  end.
