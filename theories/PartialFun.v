@@ -20,6 +20,7 @@ Set Universe Polymorphism.
   - Mutual functions without the need for encoding?
   - Better support for monads by having orec be a monad transformer?
   - Have scopes or even modules for notations.
+  - Better class for autodef.
 
 *)
 
@@ -512,6 +513,83 @@ Section Lib.
     eapply def_ind. all: eassumption.
   Qed.
 
+  (* Same as funind but for Type *)
+
+  Notation precondT := (A → Type).
+  Notation postcondT := (∀ x, B x → Type).
+
+  Fixpoint orec_ind_stepT a (pre : precondT) (post : postcondT) o :=
+    match o with
+    | _ret v => post a v
+    | _rec x κ => pre x * ∀ v, post x v → orec_ind_stepT a pre post (κ v)
+    | _call g x κ => ∀ v, pgraph g x v → orec_ind_stepT a pre post (κ v)
+    | undefined => True
+    end%type.
+
+  Definition funrect pre post :=
+    ∀ x, pre x → orec_ind_stepT x pre post (f x).
+
+  Lemma orec_inst_ind_stepT :
+    ∀ a o hdo da ha (r : ∀ y, domain y → partial_lt y a → image y) pre post,
+      orec_ind_stepT a pre post o →
+      (∀ x h hlt, pre x → post x ((r x h hlt) ∙1)) →
+      post a ((orec_inst (a := a) o hdo da ha r) ∙1).
+  Proof.
+    intros a o hdo da ha r pre post ho hr.
+    induction o as [w | x κ ih | G g hg x κ ih |] in ha, hdo, ho |- *.
+    - simpl in ho. simp orec_inst.
+    - simpl in ho. simp orec_inst. simpl.
+      apply ih. apply ho. apply hr. apply ho.
+    - simpl in ho. simp orec_inst. simpl.
+      apply ih. eapply ho. apply pdef_graph.
+    - exfalso. destruct hdo as [? h]. depelim h.
+  Qed.
+
+  Lemma def_rect :
+    ∀ pre post x h,
+      funrect pre post →
+      pre x →
+      post x (def x h).
+  Proof.
+    intros pre post x h ho hpre.
+    unfold def.
+    revert hpre.
+    (* funelim fails with an anomaly *)
+    apply_funelim (def_p x h). intros.
+    refine (orec_inst_ind_stepT _ _ _ _ _ _ _ _ _ _).
+    - apply ho. assumption.
+    - intros. eapply X1. assumption.
+  Qed.
+
+  Lemma funrect_graph :
+    ∀ pre post x v,
+      funrect pre post →
+      pre x →
+      graph x v →
+      post x v.
+  Proof.
+    intros pre post x v h hpre e.
+    assert (hx : domain x).
+    { eexists. eassumption. }
+    pose proof (def_graph_sound x hx) as hgr.
+    assert (v = def x hx).
+    { eapply orec_graph_functional. all: eassumption. }
+    subst.
+    eapply def_rect. all: eassumption.
+  Qed.
+
+  Lemma funrect_fuel :
+    ∀ pre post x n v,
+      funrect pre post →
+      pre x →
+      fueled n x = Success v →
+      post x v.
+  Proof.
+    intros pre post x n v h hpre e.
+    eapply fueled_graph_sound in e.
+    eapply funrect_graph in e. all: eassumption.
+  Qed.
+
   (* Computing the domain, easier than using the graph *)
 
   Fixpoint comp_domain {a} (o : orec A B a) :=
@@ -587,13 +665,25 @@ Definition call {A B} {F} f `{PFun F f} (x : psrc f) : orec A B (ptgt f x) :=
 Tactic Notation "funind" constr(p) "in" hyp(h) :=
   lazymatch type of h with
   | graph ?f ?x ?v =>
-    eapply funind_graph with (1 := p) in h ; [| try (exact I)]
+    lazymatch type of p with
+    | context [ funind _ _ _ ] =>
+      eapply funind_graph with (1 := p) in h ; [| try (exact I)]
+    | context [ funrect _ _ _ ] =>
+      eapply funrect_graph with (1 := p) in h ; [| try (exact I)]
+    | _ => fail "Argument should be of type funind or funrect"
+    end
   | _ => fail "Hypothesis should be about graph"
   end.
 
 Tactic Notation "funind" constr(p) "in" hyp(h) "as" ident(na) :=
   lazymatch type of h with
   | graph ?f ?x ?v =>
-    eapply funind_graph with (1 := p) in h as na ; [| try (exact I)]
+    lazymatch type of p with
+    | context [ funind _ _ _ ] =>
+      eapply funind_graph with (1 := p) in h as na ; [| try (exact I)]
+    | context [ funrect _ _ _ ] =>
+      eapply funrect_graph with (1 := p) in h as na ; [| try (exact I)]
+    | _ => fail "Argument should be of type funind or funrect"
+    end
   | _ => fail "Hypothesis should be about graph"
   end.
