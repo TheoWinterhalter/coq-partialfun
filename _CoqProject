@@ -1,4 +1,5 @@
 -R theories PartialFun
 
+theories/Monad.v
 theories/PartialFun.v
 theories/Examples.v

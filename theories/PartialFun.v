@@ -2,6 +2,8 @@
 
 From Equations Require Import Equations.
 From Coq Require Import Utf8 List Arith Lia.
+From PartialFun Require Import Monad.
+
 Import ListNotations.
 
 Set Default Goal Selector "!".
@@ -17,8 +19,7 @@ Set Universe Polymorphism.
     exponential fuel with linear input.
   - Mutual functions without the need for encoding?
   - Better support for monads by having orec be a monad transformer?
-  - Allow the user to write call or rec without a ret clause with nicer
-    notations?
+  - Have scopes or even modules for notations.
 
 *)
 
@@ -101,15 +102,23 @@ Proof.
 Qed.
 
 Inductive orec A B C :=
-| ret (x : C)
-| rec (x : A) (κ : B x → orec A B C)
-| call F f `{hf : PFun F f} (x : psrc f) (κ : ptgt f x → orec A B C)
+| _ret (x : C)
+| _rec (x : A) (κ : B x → orec A B C)
+| _call F f `{hf : PFun F f} (x : psrc f) (κ : ptgt f x → orec A B C)
 | undefined.
 
-Arguments ret {A B C}.
-Arguments rec {A B C}.
-Arguments call {A B C F} f {hf}.
+Arguments _ret {A B C}.
+Arguments _rec {A B C}.
+Arguments _call {A B C F} f {hf}.
 Arguments undefined {A B C}.
+
+Fixpoint _bind {A B C D} (c : orec A B C) (f : C → orec A B D) : orec A B D :=
+  match c with
+  | _ret x => f x
+  | _rec x κ => _rec x (λ y, _bind (κ y) f)
+  | _call g x κ => _call g x (λ y, _bind (κ y) f)
+  | undefined => undefined
+  end.
 
 Notation "∇ x , B" :=
   (∀ x, orec _ (λ x, B) B)
@@ -118,14 +127,6 @@ Notation "∇ x , B" :=
 Notation "A ⇀ B" :=
   (∇ (_ : A), B)
   (at level 199).
-
-Notation "x ← e ;; f" :=
-  (e (λ x, f))
-  (at level 100, e at next level, right associativity, only parsing).
-
-Notation "' pat ← e ;; f" :=
-  (e (λ x, f))
-  (at level 100, e at next level, right associativity, pat pattern, only parsing).
 
 #[local] Notation "t ∙1" := (proj1_sig t) (at level 20).
 #[local] Notation "⟨ x ⟩" := (exist _ x _) (only parsing).
@@ -138,19 +139,19 @@ Section Lib.
   Inductive orec_graph {a} : orec A B (B a) → B a → Prop :=
   | ret_graph :
       ∀ x,
-        orec_graph (ret x) x
+        orec_graph (_ret x) x
 
   | rec_graph :
       ∀ x κ v w,
         orec_graph (f x) v →
         orec_graph (κ v) w →
-        orec_graph (rec x κ) w
+        orec_graph (_rec x κ) w
 
   | call_graph :
       ∀ F g hg x κ v w,
         pgraph g x v →
         orec_graph (κ v) w →
-        orec_graph (call (F := F) g (hf := hg) x κ) w.
+        orec_graph (_call (F := F) g (hf := hg) x κ) w.
 
   Definition graph x v :=
     orec_graph (f x) v.
@@ -158,19 +159,19 @@ Section Lib.
   Inductive orec_lt {a} : A → orec A B (B a) → Prop :=
   | top_lt :
       ∀ x κ,
-        orec_lt x (rec x κ)
+        orec_lt x (_rec x κ)
 
   | rec_lt :
       ∀ x κ v y,
         graph x v →
         orec_lt y (κ v) →
-        orec_lt y (rec x κ)
+        orec_lt y (_rec x κ)
 
   | call_lt :
       ∀ F g hg x κ v y,
         pgraph g x v →
         orec_lt y (κ v) →
-        orec_lt y (call (F := F) g (hf := hg) x κ).
+        orec_lt y (_call (F := F) g (hf := hg) x κ).
 
   Definition partial_lt x y :=
     orec_lt x (f y).
@@ -230,14 +231,14 @@ Section Lib.
 
   Fixpoint orec_fuel_inst {a} n (e : orec A B (B a)) (r : ∀ x, Fueled (B x)) :=
     match e with
-    | ret v => Success v
-    | rec x κ =>
+    | _ret v => Success v
+    | _rec x κ =>
       match r x with
       | Success v => orec_fuel_inst n (κ v) r
       | NotEnoughFuel => NotEnoughFuel
       | Undefined => Undefined
       end
-    | call g x κ =>
+    | _call g x κ =>
       match pfueled g n x with
       | Success v => orec_fuel_inst n (κ v) r
       | NotEnoughFuel => NotEnoughFuel
@@ -365,9 +366,9 @@ Section Lib.
     (da : domain a)
     (ha : ∀ x, orec_lt x e → partial_lt x a)
     (r : ∀ y, domain y → partial_lt y a → image y) : oimage e :=
-    orec_inst (ret v) de da ha r := ⟨ v ⟩ ;
-    orec_inst (rec x κ) de da ha r := ⟨ (orec_inst (κ ((r x _ _) ∙1)) _ _ _ r) ∙1 ⟩ ;
-    orec_inst (call g x κ) de da ha r := ⟨ (orec_inst (κ (pdef g x _)) _ _ _ r) ∙1 ⟩ ;
+    orec_inst (_ret v) de da ha r := ⟨ v ⟩ ;
+    orec_inst (_rec x κ) de da ha r := ⟨ (orec_inst (κ ((r x _ _) ∙1)) _ _ _ r) ∙1 ⟩ ;
+    orec_inst (_call g x κ) de da ha r := ⟨ (orec_inst (κ (pdef g x _)) _ _ _ r) ∙1 ⟩ ;
     orec_inst undefined de da ha r := False_rect _ _.
   Proof.
     - constructor.
@@ -438,9 +439,9 @@ Section Lib.
 
   Fixpoint orec_ind_step a (pre : precond) (post : postcond) o :=
     match o with
-    | ret v => post a v
-    | rec x κ => pre x ∧ ∀ v, post x v → orec_ind_step a pre post (κ v)
-    | call g x κ =>
+    | _ret v => post a v
+    | _rec x κ => pre x ∧ ∀ v, post x v → orec_ind_step a pre post (κ v)
+    | _call g x κ =>
         ∃ φ ψ, pfunind g φ ψ ∧ φ x ∧ ∀ v, ψ x v → orec_ind_step a pre post (κ v)
     | undefined => True
     end.
@@ -546,9 +547,9 @@ Section Lib.
 
   Fixpoint comp_domain {a} (o : orec A B a) :=
     match o with
-    | ret v => True
-    | rec x κ => domain x ∧ ∀ v, graph x v → comp_domain (κ v)
-    | call g x κ => pdomain g x ∧ ∀ v, pgraph g x v → comp_domain (κ v)
+    | _ret v => True
+    | _rec x κ => domain x ∧ ∀ v, graph x v → comp_domain (κ v)
+    | _call g x κ => pdomain g x ∧ ∀ v, pgraph g x v → comp_domain (κ v)
     | undefined => False
     end.
 
@@ -600,3 +601,16 @@ Defined.
 
 (* Handy notation for autodef *)
 Notation "f @ x" := (autodef f x) (at level 10).
+
+(* orec is a monad *)
+#[export] Instance MonadOrec {A B} : Monad (orec A B) := {|
+  ret C x := _ret x ;
+  bind C D c f := _bind c f
+|}.
+
+(* It has some actions *)
+Definition rec {A B} (x : A) : orec A B (B x) :=
+  _rec x (λ y, ret y).
+
+Definition call {A B} {F} f `{PFun F f} (x : psrc f) : orec A B (ptgt f x) :=
+  _call f x (λ y, ret y).
