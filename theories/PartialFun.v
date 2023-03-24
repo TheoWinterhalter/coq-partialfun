@@ -62,7 +62,7 @@ Class PFun {A} (f : A) := {
   pdef : ∀ x, pdomain x → ptgt x ;
   pdef_graph : ∀ x h, pgraph x (pdef x h) ;
   pfunind : (psrc → Prop) → (∀ x, ptgt x → Prop) → Prop ;
-  pfunind_graph : ∀ φ ψ x v, pfunind φ ψ → φ x → pgraph x v → ψ x v
+  pfunind_graph : ∀ φ ψ, pfunind φ ψ → ∀ x v, φ x → pgraph x v → ψ x v
 }.
 
 Arguments psrc {A} f {_}.
@@ -441,7 +441,7 @@ Section Lib.
     | ret v => post a v
     | rec x κ => pre x ∧ ∀ v, post x v → orec_ind_step a pre post (κ v)
     | call g x κ =>
-        ∃ φ ψ, pfunind g φ ψ ∧ φ x ∧ ∀ v, ψ x v → orec_ind_step a pre post (κ v)
+        ∃ φ (ψ : ∀ x, ptgt g x -> Prop), φ x ∧ (∀ x v, φ x → pgraph g x v → ψ x v) ∧ ∀ v, ψ x v → orec_ind_step a pre post (κ v)
     | undefined => True
     end.
 
@@ -469,7 +469,10 @@ Section Lib.
       destruct pfueled as [w | |] eqn:e'. 2,3: discriminate.
       eapply ih. 2: eassumption.
       destruct h as [φ [ψ [hig [hx hκ]]]].
-      apply hκ. eapply pfunind_fueled. all: eassumption.
+      apply hκ, hx.
+      1: assumption.
+      eapply pfueled_graph.
+      eassumption.
     - discriminate.
   Qed.
 
@@ -503,7 +506,9 @@ Section Lib.
     - simpl in ho. simp orec_inst. simpl.
       apply ih.
       destruct ho as [φ [ψ [hig [hx hκ]]]].
-      apply hκ. eapply pfunind_def. all: eassumption.
+      apply hκ, hx.
+      1: eassumption.
+      eapply pdef_graph.
     - destruct hdo as [? h]. depelim h.
   Qed.
 
@@ -526,13 +531,14 @@ Section Lib.
   (* We deduce the graph case from the above *)
 
   Lemma funind_graph :
-    ∀ pre post x v,
+    ∀ pre post,
       funind pre post →
+    ∀ x v,
       pre x →
       graph x v →
       post x v.
   Proof.
-    intros pre post x v h hpre e.
+    intros pre post h x v hpre e.
     assert (hx : domain x).
     { eexists. eassumption. }
     pose proof (def_graph_sound x hx) as hgr.
@@ -582,6 +588,8 @@ Section Lib.
 
 End Lib.
 
+Arguments funind_graph {A B f pre post} _ _ _ _ _.
+
 (* We can provide an instance for all partial functions defined as above. *)
 #[export, refine] Instance pfun_gen A B (f : ∇ (x : A), B x) : PFun f := {|
   psrc := A ;
@@ -595,7 +603,7 @@ Proof.
   - intros. eapply orec_graph_functional. all: eassumption.
   - apply fueled_graph_sound.
   - apply def_graph_sound.
-  - apply funind_graph.
+  - eapply @funind_graph.
 Defined.
 
 (* Handy notation for autodef *)

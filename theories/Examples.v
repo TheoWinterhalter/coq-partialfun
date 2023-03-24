@@ -65,7 +65,7 @@ Proof.
     - intuition lia.
   }
   intros n m [v hd].
-  refine (funind_graph _ _ _ (_,_) _ h _ _). all: eauto.
+  refine (funind_graph h (_,_) _ _ _). all: eauto.
 Qed.
 
 Lemma test_div_domain :
@@ -320,11 +320,11 @@ Lemma conv_sound :
 Proof.
   intros [u v] _. simpl.
   eexists _, _. splits.
-  1: apply eval_sound.
+  2: eapply (funind_graph eval_sound).
   1: simpl ; auto.
   simpl. intros u' hu.
   eexists _, _. splits.
-  1: apply eval_sound.
+  2: eapply (funind_graph eval_sound).
   1: simpl ; auto.
   simpl. intros v' hv e.
   exists u', v'.
