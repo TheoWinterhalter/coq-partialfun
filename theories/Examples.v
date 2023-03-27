@@ -320,14 +320,9 @@ Lemma conv_sound :
   funind conv (λ _, True) (λ '(u, v) b, b = true → isconv u v).
 Proof.
   intros [u v] _. simpl.
-  eexists _, _. splits.
-  1: apply eval_sound.
-  1: simpl ; auto.
-  simpl. intros u' hu.
-  eexists _, _. splits.
-  1: apply eval_sound.
-  1: simpl ; auto.
-  simpl. intros v' hv e.
+  intros u' hu v' hv e.
+  funind eval_sound in hu.
+  funind eval_sound in hv.
   exists u', v'.
   intuition assumption.
 Qed.
