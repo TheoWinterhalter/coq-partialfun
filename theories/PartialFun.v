@@ -15,8 +15,6 @@ Set Universe Polymorphism.
   - Maybe some subclasses to be able to only specify the fueled and/or the wf
     versions.
     + Maybe use a hint with high cost for the default instance to ease override.
-  - Make fueled resumable so it can be composed in the continuation to have
-    exponential fuel with linear input.
   - Mutual functions without the need for encoding?
   - Better support for monads by having orec be a monad transformer?
   - Have scopes or even modules for notations.
@@ -221,11 +219,15 @@ Section Lib.
     | undefined => Undefined
     end.
 
-  Fixpoint fueled n x : Fueled (B x) :=
+  (* fumes is there to get depth exponential in n *)
+  Fixpoint fueled_gen n (fumes : ∀ y, Fueled (B y)) x : Fueled (B x) :=
     match n with
-    | 0 => NotEnoughFuel
-    | S n => orec_fuel_inst n (f x) (fueled n)
+    | 0 => fumes x
+    | S n => orec_fuel_inst n (f x) (fueled_gen n (λ x, fueled_gen n fumes x))
     end.
+
+  Definition fueled n x :=
+    fueled_gen n (λ _, NotEnoughFuel) x.
 
   (* We show the fueled version is sound with respect to the graph *)
 
@@ -249,15 +251,33 @@ Section Lib.
     - discriminate.
   Qed.
 
+  Lemma fueled_gen_graph_sound :
+    ∀ n fumes x v,
+      (∀ y w, fumes y = Success w → graph y w) →
+      fueled_gen n fumes x = Success v →
+      graph x v.
+  Proof.
+    intros n fumes x v hfumes e.
+    induction n as [| n ih] in x, v, e, fumes, hfumes |- *.
+    - eapply hfumes. assumption.
+    - simpl in e.
+      eapply orec_fuel_inst_graph.
+      + eassumption.
+      + intros y w e'.
+        eapply ih. 2: eassumption.
+        intros z k e2.
+        eapply ih. 2: eassumption.
+        eapply hfumes.
+  Qed.
+
   Lemma fueled_graph_sound :
     ∀ n x v,
       fueled n x = Success v →
       graph x v.
   Proof.
     intros n x v e.
-    induction n as [| n ih] in x, v, e |- *. 1: discriminate.
-    simpl in e.
-    eapply orec_fuel_inst_graph. all: eassumption.
+    eapply fueled_gen_graph_sound. 2: eassumption.
+    intros. discriminate.
   Qed.
 
   (** Note: the lemma above says that if fueled succeeds, then its argument is
@@ -446,6 +466,26 @@ Section Lib.
     - discriminate.
   Qed.
 
+  Lemma funind_fuel_gen :
+    ∀ pre post x n fumes v,
+      funind pre post →
+      pre x →
+      (∀ x v, fumes x = Success v → pre x → post x v) →
+      fueled_gen n fumes x = Success v →
+      post x v.
+  Proof.
+    intros pre post x n fumes v h hpre hfumes e.
+    induction n as [| n ih] in x, v, hpre, e, fumes, hfumes |- *.
+    - simpl in e. apply hfumes. all: assumption.
+    - simpl in e. eapply orec_fuel_inst_ind_step. 2: eassumption.
+      + apply h. assumption.
+      + intros y w hy e'.
+        eapply ih. 1,3: eassumption.
+        simpl.
+        intros z u hz e2.
+        eapply ih. all: eassumption.
+  Qed.
+
   Lemma funind_fuel :
     ∀ pre post x n v,
       funind pre post →
@@ -454,10 +494,8 @@ Section Lib.
       post x v.
   Proof.
     intros pre post x n v h hpre e.
-    induction n as [| n ih] in x, v, hpre, e |- *. 1: discriminate.
-    eapply orec_fuel_inst_ind_step. 2: eassumption.
-    - apply h. assumption.
-    - apply ih.
+    eapply funind_fuel_gen. 1,2,4: eassumption.
+    simpl. intros. discriminate.
   Qed.
 
   (* The wf case *)
