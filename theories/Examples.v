@@ -535,4 +535,4 @@ Qed.
 Equations ediv : ∀ (p : nat * nat), orec_exn error (nat * nat) (λ _, exn error nat) nat :=
   ediv (n, 0) := raise DivisionByZero ;
   ediv (0, m) := ret 0 ;
-  ediv (n, m) := rec (n - m, m).
+  ediv (n, m) := S <*> rec (n - m, m).
