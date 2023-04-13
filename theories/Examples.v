@@ -531,18 +531,9 @@ Proof.
   apply MonadRaiseExnT.
 Qed.
 
-Class OrecEffect (M : Type → Type) := {
-  combined : ∀  (A : Type) (B : A → Type) (C : Type), Type ;
-  combined_monad : ∀ A B, Monad (combined A B)
-}.
-
 #[local] Instance OrecEffectExn E : OrecEffect (exn E) := {|
   combined A B := orec_exn E A B
 |}.
-
-Notation "∇ x , M ♯ B" :=
-  (∀ x, combined (M := M) _ (λ x, M B) B)
-  (x binder, at level 200).
 
 Equations ediv : ∇ (p : nat * nat), exn error ♯ nat :=
   ediv (n, 0) := raise DivisionByZero ;
