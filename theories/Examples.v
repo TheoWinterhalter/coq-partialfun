@@ -555,3 +555,25 @@ Proof.
     + apply ih. lia.
     + intros [] _. all: cbn. all: constructor.
 Qed.
+
+Definition succeeds {E A} (m : exn E A) :=
+  match m with
+  | success _ => true
+  | _ => false
+  end.
+
+Lemma ediv_noraise :
+  funind ediv
+    (λ '(n, m), m ≠ 0)
+    (λ '(n, m) r, succeeds r = true).
+Proof.
+  intros [n m] h.
+  funelim (ediv (n, m)).
+  all: cbn - ["-"].
+  - lia.
+  - reflexivity.
+  - split. 1: assumption.
+    intros [] ?. all: cbn.
+    + reflexivity.
+    + assumption.
+Qed.
