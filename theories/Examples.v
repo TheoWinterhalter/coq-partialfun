@@ -514,7 +514,7 @@ Definition orec_exn E A B C := orec A B (exn E C).
 #[local] Instance MonadOrecExn {E A B} : Monad (orec_exn E A B).
 Proof.
   apply MonadExnT.
-Qed.
+Defined.
 
 Class MonadRaise E (M : Type → Type) := {
   raise : ∀ (A : Type), E → M A
@@ -529,7 +529,7 @@ Arguments raise {E M _ A} e.
 #[local] Instance MonadRaiseOrecExn {E A B} : MonadRaise E (orec_exn E A B).
 Proof.
   apply MonadRaiseExnT.
-Qed.
+Defined.
 
 #[local] Instance OrecEffectExn E : OrecEffect (exn E) := {|
   combined A B := orec_exn E A B
@@ -539,3 +539,19 @@ Equations ediv : ∇ (p : nat * nat), exn error ♯ nat :=
   ediv (n, 0) := raise DivisionByZero ;
   ediv (0, m) := ret 0 ;
   ediv (n, m) := S <*> rec (n - m, m).
+
+Lemma ediv_total :
+  ∀ n m,
+    domain ediv (n, m).
+Proof.
+  intros n m.
+  assert (hw : WellFounded lt).
+  { exact _. }
+  specialize (hw n). induction hw as [n hn ih].
+  apply compute_domain. funelim (ediv (n, m)). all: cbn.
+  - constructor.
+  - constructor.
+  - split.
+    + apply ih. lia.
+    + intros [] _. all: cbn. all: constructor.
+Qed.
