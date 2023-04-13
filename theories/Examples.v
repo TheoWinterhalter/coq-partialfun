@@ -471,3 +471,68 @@ Proof.
   - apply ih. apply R_right. 1: reflexivity.
     constructor.
 Qed.
+
+(* Example of a partial monadic program, ie with an extra monad in the return
+  type.
+*)
+
+Inductive exn E A :=
+| success (x : A)
+| exception (e : E).
+
+Arguments success {E A}.
+Arguments exception {E A}.
+
+Definition exn_bind {E A B} (c : exn E A) (f : A → exn E B) :=
+  match c with
+  | success x => f x
+  | exception e => exception e
+  end.
+
+#[local] Instance MonadExn {E} : Monad (exn E) := {|
+  ret A x := success x ;
+  bind A B c f := exn_bind c f
+|}.
+
+(* Exception monad transformer *)
+#[local] Instance MonadExnT {E M} `{Monad M} : Monad (λ A, M (exn E A)) := {|
+  ret A x := ret (success x) ;
+  bind A B c f := bind (M := M) c (λ x,
+    match x with
+    | success y => f y
+    | exception e => ret (exception e)
+    end
+  )
+|}.
+
+Inductive error :=
+| DivisionByZero.
+
+Definition orec_exn E A B C := orec A B (exn E C).
+#[local] Typeclasses Opaque orec_exn.
+
+#[local] Instance MonadOrecExn {E A B} : Monad (orec_exn E A B).
+Proof.
+  apply MonadExnT.
+Qed.
+
+Class MonadRaise E (M : Type → Type) := {
+  raise : ∀ (A : Type), E → M A
+}.
+
+Arguments raise {E M _ A} e.
+
+#[local] Instance MonadRaiseExnT {E M} `{Monad M} : MonadRaise E (λ A, M (exn E A)) := {|
+  raise A e := ret (exception e)
+|}.
+
+#[local] Instance MonadRaiseOrecExn {E A B} : MonadRaise E (orec_exn E A B).
+Proof.
+  apply MonadRaiseExnT.
+Qed.
+
+(* Equations ediv : ∇ (p : nat * nat), exn error nat := *)
+Equations ediv : ∀ (p : nat * nat), orec_exn error (nat * nat) (λ _, exn error nat) nat :=
+  ediv (n, 0) := raise DivisionByZero ;
+  ediv (0, m) := ret 0 ;
+  ediv (n, m) := rec (n - m, m).
