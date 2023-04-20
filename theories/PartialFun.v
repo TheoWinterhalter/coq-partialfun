@@ -337,7 +337,7 @@ Section Lib.
   #[local] Instance wf_partial :
     WellFounded (λ (x y : sigmaarg), partial_lt (pr1 x) (pr1 y)).
   Proof.
-    (* eapply Acc_intro_generator with (1 := acc_fuel). *)
+    eapply Acc_intro_generator with (1 := acc_fuel).
     intros [x h].
     pose proof (partial_lt_acc x h) as hacc.
     induction hacc as [x hacc ih] in h |- *.
@@ -346,7 +346,7 @@ Section Lib.
   Defined.
 
   (* We need this for the proofs to go through *)
-  (* Opaque wf_partial. *)
+  Opaque wf_partial.
 
   Definition image x :=
     { v | graph x v }.
@@ -407,7 +407,6 @@ Section Lib.
     - destruct de as [v hg]. depelim hg.
   Defined.
 
-  Unset Equations With Funext.
   Obligation Tactic := idtac.
   Equations def_p (x : A) (h : domain x) : image x
     by wf x partial_lt :=
@@ -554,7 +553,7 @@ Section Lib.
     apply_funelim (def_p x h). intros.
     refine (orec_inst_ind_step _ _ _ _ _ _ _ _ _ _).
     - apply ho. assumption.
-    - intros. eapply H1. assumption.
+    - intros. now eapply H.
   Qed.
 
   (* We deduce the graph case from the above *)
@@ -622,7 +621,7 @@ Section Lib.
     apply_funelim (def_p x h). intros.
     refine (orec_inst_ind_stepT _ _ _ _ _ _ _ _ _ _).
     - apply ho. assumption.
-    - intros. eapply X1. assumption.
+    - intros. now eapply X.
   Qed.
 
   Lemma funrect_graph :
