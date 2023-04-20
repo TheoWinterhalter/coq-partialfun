@@ -8,6 +8,7 @@ Import ListNotations.
 
 Set Default Goal Selector "!".
 Set Equations Transparent.
+Unset Equations With Funext.
 Set Universe Polymorphism.
 
 (* TODOs
@@ -336,7 +337,7 @@ Section Lib.
   #[local] Instance wf_partial :
     WellFounded (λ (x y : sigmaarg), partial_lt (pr1 x) (pr1 y)).
   Proof.
-    eapply Acc_intro_generator with (1 := acc_fuel).
+    (* eapply Acc_intro_generator with (1 := acc_fuel). *)
     intros [x h].
     pose proof (partial_lt_acc x h) as hacc.
     induction hacc as [x hacc ih] in h |- *.
@@ -345,7 +346,7 @@ Section Lib.
   Defined.
 
   (* We need this for the proofs to go through *)
-  Opaque wf_partial.
+  (* Opaque wf_partial. *)
 
   Definition image x :=
     { v | graph x v }.
@@ -406,9 +407,33 @@ Section Lib.
     - destruct de as [v hg]. depelim hg.
   Defined.
 
+  Unset Equations With Funext.
+  Obligation Tactic := idtac.
   Equations def_p (x : A) (h : domain x) : image x
     by wf x partial_lt :=
-    def_p x h := orec_inst (a := x) (f x) _ _ _ (λ y hy hr, def_p y _).
+    def_p x h := orec_inst (a := x) (f x) h h (fun x Hx => Hx) (λ y hy hr, def_p y hy).
+  Next Obligation.
+  intros.
+  assumption.
+  Defined.
+  Next Obligation.
+  intros x h.
+  unfold def_p_unfold, def_p at 1, FixWf, Fix, wellfounded.
+  set (p := {| pr1 := x; pr2 := h |}).
+  change x with (pr1 p).
+  change h with (pr2 p).
+  clearbody p.
+  clear x h.
+  destruct (wf_partial p) ; cbn.
+  unfold def_p_functional ; cbn.
+  f_equal.
+  - intros _ _ _ _ _ ->.
+    reflexivity.
+  - do 3 (apply functional_extensionality_dep ; intros).
+    unfold def_p_obligations_obligation_1, def_p, FixWf, Fix, def_p_functional.
+    f_equal.
+    apply Acc_pi.
+  Defined.
 
   Definition def x h :=
     def_p x h ∙1.
@@ -593,6 +618,7 @@ Section Lib.
     unfold def.
     revert hpre.
     (* funelim fails with an anomaly *)
+    (* uses function extensionality somehow!! *)
     apply_funelim (def_p x h). intros.
     refine (orec_inst_ind_stepT _ _ _ _ _ _ _ _ _ _).
     - apply ho. assumption.
