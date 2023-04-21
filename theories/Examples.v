@@ -508,14 +508,6 @@ Definition exn_bind {E A B} (c : exn E A) (f : A → exn E B) :=
 Inductive error :=
 | DivisionByZero.
 
-Definition orec_exn E A B C := orec A B (exn E C).
-#[local] Typeclasses Opaque orec_exn.
-
-#[local] Instance MonadOrecExn {E A B} : Monad (orec_exn E A B).
-Proof.
-  apply MonadExnT.
-Defined.
-
 Class MonadRaise E (M : Type → Type) := {
   raise : ∀ (A : Type), E → M A
 }.
@@ -526,14 +518,11 @@ Arguments raise {E M _ A} e.
   raise A e := ret (exception e)
 |}.
 
-#[local] Instance MonadRaiseOrecExn {E A B} : MonadRaise E (orec_exn E A B).
+#[local] Instance OrecEffectExn E : OrecEffect (exn E).
 Proof.
-  apply MonadRaiseExnT.
+  constructor.
+  intros A B. apply MonadExnT.
 Defined.
-
-#[local] Instance OrecEffectExn E : OrecEffect (exn E) := {|
-  combined A B := orec_exn E A B
-|}.
 
 Equations ediv : ∇ (p : nat * nat), exn error ♯ nat :=
   ediv (n, 0) := raise DivisionByZero ;

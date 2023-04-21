@@ -663,13 +663,21 @@ Definition call {A B} {F} f `{PFun F f} (x : psrc f) : orec A B (ptgt f x) :=
 (* Combining orec with other effects (rather constrained) *)
 
 Class OrecEffect (M : Type → Type) := {
-  combined : ∀  (A : Type) (B : A → Type) (C : Type), Type ;
+  (* combined : ∀  (A : Type) (B : A → Type) (C : Type), Type ; *)
+  combined A B C := orec A B (M C) ;
   combined_monad : ∀ A B, Monad (combined A B)
 }.
+
+(* Typeclasses Opaque combined. *)
 
 Notation "∇ x , M ♯ B" :=
   (∀ x, combined (M := M) _ (λ x, M B) B)
   (x binder, at level 200).
+
+(* PFun instance for effectful partial functions *)
+#[export] Instance pfun_eff_gen
+  A B E `{OrecEffect E} (f : ∇ (x : A), E ♯ B x) : PFun f :=
+  pfun_gen A (λ x, E (B x)) f.
 
 (* Useful tactics *)
 
