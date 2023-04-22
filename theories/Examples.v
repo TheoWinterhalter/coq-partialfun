@@ -570,7 +570,7 @@ Proof.
     + assumption.
 Qed.
 
-(* Now combining effects *)
+(* Now combining effects TODO clean! *)
 
 Class SubEffect (M M' : Type → Type) := {
   seff_lift : ∀ A, M A → M' A
@@ -619,16 +619,16 @@ Proof.
 (* Definition eff_call {A B C D E} `{OrecEffect E} (f : ∇ (x : C), E ♯ D) (x : C) : combined A B D :=
   _call f x (λ y, ret y). *)
 
-Definition eff_call {A B C D E} `{OrecEffect E} (f : ∇ (x : C), E ♯ D) (x : C) : combined A B D.
+(* Definition eff_call {A B C D E} `{OrecEffect E} (f : ∇ (x : C), E ♯ D) (x : C) : combined A B D.
 Proof.
   unfold combined.
   pose (call (A := A) (B := B) f x). simpl in o.
   Fail exact o.
 (* :=
   call f x. *)
-Abort.
+Abort. *)
 
-#[export] Typeclasses Opaque combined.
+(* #[export] Typeclasses Opaque combined. *)
 
 Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
   test_ediv (n, m) := q ← call ediv (n, m) ;; ret (q * m =? n).
@@ -636,5 +636,5 @@ Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
 Equations compare_div : ∇ (p : nat * nat), exn error ♯ nat :=
   compare_div (n, m) :=
     q ← call ediv (n, m) ;;
-    (* q' ← call (div (n, m)) ;; *)
+    q' ← (_call div (n, m) (λ x, ret x)) ;;
     ret q.
