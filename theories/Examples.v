@@ -8,6 +8,7 @@ Import MonadNotations.
 Set Default Goal Selector "!".
 Set Equations Transparent.
 Set Universe Polymorphism.
+Set Polymorphic Inductive Cumulativity.
 
 (* Small examples *)
 
@@ -489,13 +490,13 @@ Definition exn_bind {E A B} (c : exn E A) (f : A → exn E B) :=
   | exception e => exception e
   end.
 
-#[local] Instance MonadExn {E} : Monad (exn E) := {|
+(* #[local] Instance *) Definition MonadExn {E} : Monad (exn E) := {|
   ret A x := success x ;
   bind A B c f := exn_bind c f
 |}.
 
 (* Exception monad transformer *)
-#[local] Instance MonadExnT {E M} `{Monad M} : Monad (λ A, M (exn E A)) := {|
+(* #[local] Instance *) Definition MonadExnT {E M} `{Monad M} : Monad (λ A, M (exn E A)) := {|
   ret A x := ret (success x) ;
   bind A B c f := bind (M := M) c (λ x,
     match x with
@@ -523,6 +524,8 @@ Proof.
   constructor.
   intros A B. apply MonadExnT.
 Defined.
+
+#[export] Existing Instance combined_monad.
 
 Equations ediv : ∇ (p : nat * nat), exn error ♯ nat :=
   ediv (n, 0) := raise DivisionByZero ;
@@ -566,3 +569,72 @@ Proof.
     + reflexivity.
     + assumption.
 Qed.
+
+(* Now combining effects *)
+
+Class SubEffect (M M' : Type → Type) := {
+  seff_lift : ∀ A, M A → M' A
+}.
+
+Arguments seff_lift {M M' _ A}.
+
+Class LaxSubEffect (M M' : Type → Type) := {
+  eff_lift : ∀ A, M A → M' A
+}.
+
+Arguments eff_lift {M M' _ A}.
+
+(* #[export] Instance LaxSubEffectTrans
+  E F G (h₁ : SubEffect E F) (h₂ : LaxSubEffect F G) : LaxSubEffect E G := {|
+  eff_lift A x := eff_lift (seff_lift x)
+|}. *)
+
+(* #[export] Instance LaxSubEffectRefl E : LaxSubEffect E E := {|
+  eff_lift A x := x
+|}. *)
+
+(* Fixpoint orec_eff_lift {A B C E F} (lFG : ∀ D, E D → F D) (o : orec A (λ x, E (B x)) (E C)) :
+  orec A (λ x, F (B x)) (F C) :=
+  match o with
+  | _ret x => _ret (lFG _ x)
+  | _rec x κ => _rec x (λ y, orec_eff_lift lFG (κ y))
+  | _call g x κ => _call g x (λ y, orec_eff_lift lFG (κ y))
+  | undefined => undefined
+  end.
+
+#[export] Instance SubEffectOrecPure A B E (h : OrecEffect E) :
+  SubEffect (orec A B) (combined (M := E) A (λ x, E (B x))).
+Proof.
+  constructor.
+  intros C x.
+  rewrite combined_def. (* bad *)
+  eapply (bind x).
+
+  := {|
+  seff_lift C x :=
+|}. *)
+
+(* Fails because call doesn't use combine in the return type I guess *)
+
+(* Definition eff_call {A B C D E} `{OrecEffect E} (f : ∇ (x : C), E ♯ D) (x : C) : combined A B D :=
+  _call f x (λ y, ret y). *)
+
+Definition eff_call {A B C D E} `{OrecEffect E} (f : ∇ (x : C), E ♯ D) (x : C) : combined A B D.
+Proof.
+  unfold combined.
+  pose (call (A := A) (B := B) f x). simpl in o.
+  Fail exact o.
+(* :=
+  call f x. *)
+Abort.
+
+#[export] Typeclasses Opaque combined.
+
+Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
+  test_ediv (n, m) := q ← call ediv (n, m) ;; ret (q * m =? n).
+
+Equations compare_div : ∇ (p : nat * nat), exn error ♯ nat :=
+  compare_div (n, m) :=
+    q ← call ediv (n, m) ;;
+    (* q' ← call (div (n, m)) ;; *)
+    ret q.

@@ -7,6 +7,7 @@ Import ListNotations.
 Set Default Goal Selector "!".
 Set Equations Transparent.
 Set Universe Polymorphism.
+Set Polymorphic Inductive Cumulativity.
 
 Class Monad (M : Type → Type) := {
   ret : ∀ A, A → M A ;

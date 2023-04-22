@@ -9,6 +9,7 @@ Import ListNotations.
 Set Default Goal Selector "!".
 Set Equations Transparent.
 Set Universe Polymorphism.
+Set Polymorphic Inductive Cumulativity.
 
 (* TODOs
 
