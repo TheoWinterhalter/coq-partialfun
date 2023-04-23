@@ -570,77 +570,36 @@ Proof.
     + assumption.
 Qed.
 
-(* Now combining effects TODO clean! *)
-
-Class SubEffect (M M' : Type → Type) := {
-  seff_lift : ∀ A, M A → M' A
-}.
-
-Arguments seff_lift {M M' _ A}.
-
-Class LaxSubEffect (M M' : Type → Type) := {
-  eff_lift : ∀ A, M A → M' A
-}.
-
-Arguments eff_lift {M M' _ A}.
-
-(* #[export] Instance LaxSubEffectTrans
-  E F G (h₁ : SubEffect E F) (h₂ : LaxSubEffect F G) : LaxSubEffect E G := {|
-  eff_lift A x := eff_lift (seff_lift x)
-|}. *)
-
-(* #[export] Instance LaxSubEffectRefl E : LaxSubEffect E E := {|
-  eff_lift A x := x
-|}. *)
-
-(* Fixpoint orec_eff_lift {A B C E F} (lFG : ∀ D, E D → F D) (o : orec A (λ x, E (B x)) (E C)) :
-  orec A (λ x, F (B x)) (F C) :=
-  match o with
-  | _ret x => _ret (lFG _ x)
-  | _rec x κ => _rec x (λ y, orec_eff_lift lFG (κ y))
-  | _call g x κ => _call g x (λ y, orec_eff_lift lFG (κ y))
-  | undefined => undefined
-  end.
-
-#[export] Instance SubEffectOrecPure A B E (h : OrecEffect E) :
-  SubEffect (orec A B) (combined (M := E) A (λ x, E (B x))).
-Proof.
-  constructor.
-  intros C x.
-  rewrite combined_def. (* bad *)
-  eapply (bind x).
-
-  := {|
-  seff_lift C x :=
-|}. *)
-
-(* Fails because call doesn't use combine in the return type I guess *)
-
-(* Definition eff_call {A B C D E} `{OrecEffect E} (f : ∇ (x : C), E ♯ D) (x : C) : combined A B D :=
-  _call f x (λ y, ret y). *)
-
-(* Definition eff_call {A B C D E} `{OrecEffect E} (f : ∇ (x : C), E ♯ D) (x : C) : combined A B D.
-Proof.
-  unfold combined.
-  pose (call (A := A) (B := B) f x). simpl in o.
-  Fail exact o.
-(* :=
-  call f x. *)
-Abort. *)
-
-(* #[export] Typeclasses Opaque combined. *)
+(* Now combining effects *)
 
 Definition lift_pure {A B C E} `{OrecEffect E} (x : C) : combined A B C :=
   ret x.
 
-Definition lift_call {A B C} {F} f `{PFun F f} (x : psrc f) g : orec A B C :=
+Definition lift_call {A B C F} f `{PFun F f} (x : psrc f) g : orec A B C :=
   _call f x (λ y, g y).
+
+Class OrecLift A B C D := {
+  orec_lift : D → orec A B C
+}.
+
+#[export] Instance OrecLiftPure A B C E `{OrecEffect E} : OrecLift A B (E C) C := {|
+  orec_lift := lift_pure
+|}.
+
+#[export] Instance OrecLiftId A B C E `{OrecEffect E} : OrecLift A B (E C) (E C) := {|
+  orec_lift x := _ret x
+|}.
+
+Definition eff_call {A B C F} f `{PFun F f} (x : psrc f) `{OrecLift A B C (ptgt f x)} :
+  orec A B C :=
+  lift_call f x orec_lift.
 
 Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
   test_ediv (n, m) := q ← call ediv (n, m) ;; ret (q * m =? n).
 
-Equations compare_div : ∇ (p : nat * nat), exn error ♯ nat :=
+Equations compare_div : ∇ (p : nat * nat), exn error ♯ bool :=
   compare_div (n, m) :=
+    (* q ← eff_call ediv (n, m) ;; *) (* Why doesn't it work? *)
     q ← call ediv (n, m) ;;
-    q' ← lift_call div (n, m) lift_pure ;;
-    ret q.
+    q' ← eff_call div (n, m) ;;
+    ret (q =? q').
