@@ -582,13 +582,27 @@ Class OrecLift A B C D := {
   orec_lift : D → orec A B C
 }.
 
-#[export] Instance OrecLiftPure A B C E `{OrecEffect E} : OrecLift A B (E C) C := {|
+Definition OrecLiftPure A B C E `{OrecEffect E} : OrecLift A B (E C) C := {|
   orec_lift := lift_pure
 |}.
 
-#[export] Instance OrecLiftId A B C E `{OrecEffect E} : OrecLift A B (E C) (E C) := {|
+#[export] Hint Extern 10 (OrecLift ?A ?B (?E ?C) ?D) =>
+  let D' := eval simpl in D in
+  constr_eq C D' ;
+  eapply OrecLiftPure ; exact _
+  (* eapply (todo (E, C, D')) *)
+  : typeclass_instances.
+
+Definition OrecLiftId A B C : OrecLift A B C C := {|
   orec_lift x := _ret x
 |}.
+
+#[export] Hint Extern 20 (OrecLift ?A ?B ?C ?D) =>
+  let C' := eval simpl in C in
+  let D' := eval simpl in D in
+  unify C' D' ;
+  eapply OrecLiftId ; exact _
+  : typeclass_instances.
 
 Definition eff_call {A B C F} f `{PFun F f} (x : psrc f) `{OrecLift A B C (ptgt f x)} :
   orec A B C :=
@@ -599,8 +613,6 @@ Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
 
 Equations compare_div : ∇ (p : nat * nat), exn error ♯ bool :=
   compare_div (n, m) :=
-    (* Why doesn't it work automatically? *)
-    q ← eff_call (1 := OrecLiftId _ _ _ _) ediv (n, m) ;;
-    (* q ← call ediv (n, m) ;; *)
+    q ← eff_call ediv (n, m) ;;
     q' ← eff_call div (n, m) ;;
     ret (q =? q').
