@@ -599,7 +599,8 @@ Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
 
 Equations compare_div : ∇ (p : nat * nat), exn error ♯ bool :=
   compare_div (n, m) :=
-    (* q ← eff_call ediv (n, m) ;; *) (* Why doesn't it work? *)
-    q ← call ediv (n, m) ;;
+    (* Why doesn't it work automatically? *)
+    q ← eff_call (1 := OrecLiftId _ _ _ _) ediv (n, m) ;;
+    (* q ← call ediv (n, m) ;; *)
     q' ← eff_call div (n, m) ;;
     ret (q =? q').
