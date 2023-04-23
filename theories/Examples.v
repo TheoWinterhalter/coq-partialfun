@@ -630,11 +630,17 @@ Abort. *)
 
 (* #[export] Typeclasses Opaque combined. *)
 
+Definition lift_pure {A B C E} `{OrecEffect E} (x : C) : combined A B C :=
+  ret x.
+
+Definition lift_call {A B C} {F} f `{PFun F f} (x : psrc f) g : orec A B C :=
+  _call f x (λ y, g y).
+
 Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
   test_ediv (n, m) := q ← call ediv (n, m) ;; ret (q * m =? n).
 
 Equations compare_div : ∇ (p : nat * nat), exn error ♯ nat :=
   compare_div (n, m) :=
     q ← call ediv (n, m) ;;
-    q' ← (_call div (n, m) (λ x, ret x)) ;;
+    q' ← lift_call div (n, m) lift_pure ;;
     ret q.
