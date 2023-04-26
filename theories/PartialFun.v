@@ -105,6 +105,10 @@ Notation "A ⇀ B" :=
 #[local] Notation "⟨ x ⟩" := (exist _ x _) (only parsing).
 #[local] Notation "⟨ x | h ⟩" := (exist _ x h).
 
+#[local] Notation "t .1" := (projT1 t) (at level 20).
+#[local] Notation "t .2" := (projT2 t) (at level 20).
+#[local] Notation "( x ; y )" := (existT _ x y).
+
 Section Lib.
 
   Context {A B} (f : ∇ (x : A), B x).
@@ -196,13 +200,13 @@ Section Lib.
 
   Lemma orec_graphT_graph :
     ∀ a o v,
-    orec_graphT (a := a) o v →
-    orec_graph o v.
+      orec_graphT (a := a) o v →
+      orec_graph o v.
   Proof.
     induction 1.
     all: econstructor ; eauto.
   Qed.
-      
+
   Lemma lt_preserves_domain :
     ∀ x y,
       domain x →
@@ -392,9 +396,9 @@ Section Lib.
     (da : domain a)
     (ha : ∀ x, orec_lt x e → partial_lt x a)
     (r : ∀ y, domain y → partial_lt y a → oimageT (f y)) : oimageT e :=
-    orec_inst (_ret v) de da ha r := existT _ v _ ;
-    orec_inst (_rec x κ) de da ha r := existT _ (projT1 (orec_inst (κ (projT1 (r x _ _))) _ _ _ r)) _ ;
-    orec_inst (_call g x κ) de da ha r := existT _ (projT1 (orec_inst (κ (pdef g x _)) _ _ _ r)) _ ;
+    orec_inst (_ret v) de da ha r := (v ; _) ;
+    orec_inst (_rec x κ) de da ha r := (((orec_inst (κ (projT1 (r x _ _))) _ _ _ r)).1 ; _) ;
+    orec_inst (_call g x κ) de da ha r := ((orec_inst (κ (pdef g x _)) _ _ _ r).1 ; _) ;
     orec_inst undefined de da ha r := False_rect _ _.
   Proof.
     - constructor.
@@ -404,7 +408,9 @@ Section Lib.
     - destruct de as [v hg]. depelim hg. simpl in *.
       destruct r as [w hw]. simpl.
       assert (w = v0).
-      { eapply orec_graph_functional ; [eapply orec_graphT_graph |..] ; eassumption. }
+      { eapply orec_graph_functional. 1: eapply orec_graphT_graph.
+        all: eassumption.
+      }
       subst.
       eexists. eassumption.
     - apply ha. econstructor. 2: eassumption.
@@ -442,7 +448,7 @@ Section Lib.
     def_p x h := orec_inst (a := x) (f x) h h (fun x Hx => Hx) (λ y hy hr, def_p y hy).
 
   Definition def x h :=
-    projT1 (def_p x h).
+    (def_p x h).1.
 
   Lemma def_graph_sound :
     ∀ x h,
@@ -452,18 +458,19 @@ Section Lib.
     unfold def. destruct def_p. apply orec_graphT_graph. assumption.
   Qed.
 
-  Lemma orec_graph_graphT x v :
-    graph x v →
-    graphT x v.
+  Lemma orec_graph_graphT :
+    ∀ x v,
+      graph x v →
+      graphT x v.
   Proof.
-    intros h.
+    intros x v h.
     unshelve epose proof (def_p x _) as [v' hT].
     1: eexists ; eassumption.
     enough (v = v') as -> by assumption.
     eapply orec_graph_functional.
     - eassumption.
-    - now apply orec_graphT_graph.
-  Qed.  
+    - apply orec_graphT_graph. assumption.
+  Qed.
 
   (* Well-founded version with automatic domain inferrence *)
 
@@ -489,26 +496,24 @@ Section Lib.
   (* Functional induction on the graph *)
 
   Lemma orec_graph_inst_ind_step :
-    ∀ pre post x y v,
+    ∀ pre post x o v,
       funind pre post →
-      orec_ind_step x pre post y →
+      orec_ind_step x pre post o →
       pre x →
-      orec_graph y v →
+      orec_graph o v →
       post x v.
   Proof.
-    intros pre post x y v hind h hpre hgraph.
-    induction hgraph ; cbn in *.
-    - easy.
-    - destruct h as [hx hv].
-      apply IHhgraph2.
-      2: eassumption.
-      apply hv, IHhgraph1.
-      2: eassumption.
-      now apply hind.
-    - apply IHhgraph.
-      2: assumption.
-      now apply h.
-  Qed. 
+    intros pre post x o v hind h hpre hgraph.
+    induction hgraph as [w | x y κ v w hy ihy hκ ihκ | x G g hg y κ v w hy hκ ihκ].
+    all: cbn in *.
+    - assumption.
+    - destruct h as [hpy hv].
+      apply ihκ. 2: assumption.
+      apply hv. apply ihy. 2: assumption.
+      apply hind. assumption.
+    - apply ihκ. 2: assumption.
+      apply h. assumption.
+  Qed.
 
   Lemma funind_graph :
     ∀ pre post x v,
@@ -532,7 +537,7 @@ Section Lib.
       post x v.
   Proof.
     intros pre post x n v h hpre ?%fueled_graph_sound.
-    eapply funind_graph ; eauto.
+    eapply funind_graph. all: eauto.
   Qed.
 
   (* The wf case *)
@@ -545,7 +550,7 @@ Section Lib.
   Proof.
     intros pre post x h ho hpre.
     pose proof def_graph_sound.
-    eapply funind_graph ; eauto.
+    eapply funind_graph. all: eauto.
   Qed.
 
   (* Same as funind but for Type *)
@@ -563,7 +568,7 @@ Section Lib.
 
   Definition funrect pre post :=
     ∀ x, pre x → orec_ind_stepT x pre post (f x).
-  
+
   Lemma orec_graph_inst_rect_step :
     ∀ pre post x y v,
       funrect pre post →
@@ -573,17 +578,15 @@ Section Lib.
       post x v.
   Proof.
     intros pre post x y v hind h hpre hgraph.
-    induction hgraph ; cbn in *.
-    - easy.
-    - destruct h as [hx hv].
-      apply IHhgraph2.
-      2: eassumption.
-      apply hv, IHhgraph1.
-      2: eassumption.
-      now apply hind.
-    - apply IHhgraph.
-      2: assumption.
-      now apply h.
+    induction hgraph as [w | x y κ v w hy ihy hκ ihκ | x G g hg y κ v w hy hκ ihκ].
+    all: cbn in *.
+    - assumption.
+    - destruct h as [hpy hv].
+      apply ihκ. 2: assumption.
+      apply hv. apply ihy. 2: assumption.
+      apply hind. assumption.
+    - apply ihκ. 2: assumption.
+      apply h. assumption.
   Qed.
 
   Lemma funrect_graph :
@@ -608,7 +611,7 @@ Section Lib.
       post x v.
   Proof.
     intros pre post x n v h hpre ?%fueled_graph_sound.
-    eapply funrect_graph ; eauto.
+    eapply funrect_graph. all: eauto.
   Qed.
 
   (* The wf case *)
@@ -621,7 +624,7 @@ Section Lib.
   Proof.
     intros pre post x h ho hpre.
     pose proof def_graph_sound.
-    eapply funrect_graph ; eauto.
+    eapply funrect_graph. all: eauto.
   Qed.
 
   (* Computing the domain, easier than using the graph *)
