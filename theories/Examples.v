@@ -8,6 +8,7 @@ Import MonadNotations.
 Set Default Goal Selector "!".
 Set Equations Transparent.
 Set Universe Polymorphism.
+Set Polymorphic Inductive Cumulativity.
 
 (* Small examples *)
 
@@ -471,3 +472,147 @@ Proof.
   - apply ih. apply R_right. 1: reflexivity.
     constructor.
 Qed.
+
+(* Example of a partial monadic program, ie with an extra monad in the return
+  type.
+*)
+
+Inductive exn E A :=
+| success (x : A)
+| exception (e : E).
+
+Arguments success {E A}.
+Arguments exception {E A}.
+
+Definition exn_bind {E A B} (c : exn E A) (f : A → exn E B) :=
+  match c with
+  | success x => f x
+  | exception e => exception e
+  end.
+
+(* #[local] Instance *) Definition MonadExn {E} : Monad (exn E) := {|
+  ret A x := success x ;
+  bind A B c f := exn_bind c f
+|}.
+
+(* Exception monad transformer *)
+(* #[local] Instance *) Definition MonadExnT {E M} `{Monad M} : Monad (λ A, M (exn E A)) := {|
+  ret A x := ret (success x) ;
+  bind A B c f := bind (M := M) c (λ x,
+    match x with
+    | success y => f y
+    | exception e => ret (exception e)
+    end
+  )
+|}.
+
+Inductive error :=
+| DivisionByZero.
+
+Class MonadRaise E (M : Type → Type) := {
+  raise : ∀ (A : Type), E → M A
+}.
+
+Arguments raise {E M _ A} e.
+
+#[local] Instance MonadRaiseExnT {E M} `{Monad M} : MonadRaise E (λ A, M (exn E A)) := {|
+  raise A e := ret (exception e)
+|}.
+
+#[local] Instance OrecEffectExn E : OrecEffect (exn E).
+Proof.
+  constructor.
+  intros A B. apply MonadExnT.
+Defined.
+
+#[export] Existing Instance combined_monad.
+
+Equations ediv : ∇ (p : nat * nat), exn error ♯ nat :=
+  ediv (n, 0) := raise DivisionByZero ;
+  ediv (0, m) := ret 0 ;
+  ediv (n, m) := S <*> rec (n - m, m).
+
+Lemma ediv_total :
+  ∀ n m,
+    domain ediv (n, m).
+Proof.
+  intros n m.
+  assert (hw : WellFounded lt).
+  { exact _. }
+  specialize (hw n). induction hw as [n hn ih].
+  apply compute_domain. funelim (ediv (n, m)). all: cbn.
+  - constructor.
+  - constructor.
+  - split.
+    + apply ih. lia.
+    + intros [] _. all: cbn. all: constructor.
+Qed.
+
+Definition succeeds {E A} (m : exn E A) :=
+  match m with
+  | success _ => true
+  | _ => false
+  end.
+
+Lemma ediv_noraise :
+  funind ediv
+    (λ '(n, m), m ≠ 0)
+    (λ '(n, m) r, succeeds r = true).
+Proof.
+  intros [n m] h.
+  funelim (ediv (n, m)).
+  all: cbn - ["-"].
+  - lia.
+  - reflexivity.
+  - split. 1: assumption.
+    intros [] ?. all: cbn.
+    + reflexivity.
+    + assumption.
+Qed.
+
+(* Now combining effects *)
+
+Definition lift_pure {A B C E} `{OrecEffect E} (x : C) : combined A B C :=
+  ret x.
+
+Definition lift_call {A B C F} f `{PFun F f} (x : psrc f) g : orec A B C :=
+  _call f x (λ y, g y).
+
+Class OrecLift A B C D := {
+  orec_lift : D → orec A B C
+}.
+
+Definition OrecLiftPure A B C E `{OrecEffect E} : OrecLift A B (E C) C := {|
+  orec_lift := lift_pure
+|}.
+
+#[export] Hint Extern 10 (OrecLift ?A ?B (?E ?C) ?D) =>
+  let D' := eval simpl in D in
+  constr_eq C D' ;
+  eapply OrecLiftPure ; exact _
+  (* eapply (todo (E, C, D')) *)
+  : typeclass_instances.
+
+Definition OrecLiftId A B C : OrecLift A B C C := {|
+  orec_lift x := _ret x
+|}.
+
+#[export] Hint Extern 20 (OrecLift ?A ?B ?C ?D) =>
+  let C' := eval simpl in C in
+  let D' := eval simpl in D in
+  unify C' D' ;
+  eapply OrecLiftId ; exact _
+  : typeclass_instances.
+
+Definition eff_call {A B C F} f `{PFun F f} (x : psrc f) `{OrecLift A B C (ptgt f x)} :
+  orec A B C :=
+  lift_call f x orec_lift.
+
+Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
+  test_ediv (n, m) := q ← call ediv (n, m) ;; ret (q * m =? n).
+
+Equations compare_div : ∇ (p : nat * nat), exn error ♯ bool :=
+  compare_div (n, m) :=
+    q ← eff_call ediv (n, m) ;;
+    q' ← eff_call div (n, m) ;;
+    ret (q =? q').
