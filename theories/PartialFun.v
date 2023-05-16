@@ -52,55 +52,51 @@ Arguments Undefined {A}.
 
 Derive NoConfusion NoConfusionHom for Fueled.
 
-(* Partial function class *)
-Class PFun {A} (f : A) := {
-  psrc : Type ;
-  ptgt : psrc → Type ;
-  pgraph : ∀ x, ptgt x → Prop ;
-  pdomain x := ∃ v, pgraph x v ;
-  pgraph_fun : ∀ x v w, pgraph x v → pgraph x w → v = w ;
-  pfueled : nat → ∀ x, Fueled (ptgt x) ;
-  pfueled_graph : ∀ n x v, pfueled n x = Success v → pgraph x v ;
-  pdef : ∀ x, pdomain x → ptgt x ;
-  pdef_graph : ∀ x h, pgraph x (pdef x h)
+(* Class of things one can call *)
+Class Callable I := {
+  csrc : I → Type ;
+  ctgt : ∀ (i : I), csrc i → Type ;
+  cgraph : ∀ (i : I) (x : csrc i), ctgt i x → Prop ;
+  cdomain i x := ∃ v, cgraph i x v ;
+  cgraph_fun : ∀ i x v w, cgraph i x v → cgraph i x w → v = w ;
+  cfueled i : nat → ∀ x, Fueled (ctgt i x) ;
+  cfueled_graph i : ∀ n x v, cfueled i n x = Success v → cgraph i x v ;
+  cdef i : ∀ x, cdomain i x → ctgt i x ;
+  cdef_graph i : ∀ x h, cgraph i x (cdef i x h)
 }.
 
-Arguments psrc {A} f {_}.
-Arguments ptgt {A} f {_}.
-Arguments pgraph {A} f {_}.
-Arguments pdomain {A} f {_}.
-Arguments pgraph_fun {A} f {_}.
-Arguments pfueled {A} f {_}.
-Arguments pfueled_graph {A} f {_}.
-Arguments pdef {A} f {_}.
-Arguments pdef_graph {A} f {_}.
+Arguments csrc {I _} i.
+Arguments ctgt {I _ i}.
+Arguments cgraph {I _} i.
+Arguments cdomain {I _} i.
+Arguments cgraph_fun {I _ i}.
+Arguments cfueled {I _} i.
+Arguments cfueled_graph {I _ i}.
+Arguments cdef {I _} i.
+Arguments cdef_graph {I _ i}.
 
-Inductive orec A B C :=
+Inductive orec I `{Callable I} A B C :=
 | _ret (x : C)
-| _rec (x : A) (κ : B x → orec A B C)
-| _call F f `{hf : PFun F f} (x : psrc f) (κ : ptgt f x → orec A B C)
+| _rec (x : A) (κ : B x → orec I A B C)
+| _call (i : I) (x : csrc i) (κ : ctgt x → orec I A B C)
 | undefined.
 
-Arguments _ret {A B C}.
-Arguments _rec {A B C}.
-Arguments _call {A B C F} f {hf}.
-Arguments undefined {A B C}.
+Arguments _ret {I _ A B C}.
+Arguments _rec {I _ A B C}.
+Arguments _call {I _ A B C} i.
+Arguments undefined {I _ A B C}.
 
-Fixpoint _bind {A B C D} (c : orec A B C) (f : C → orec A B D) : orec A B D :=
+Fixpoint _bind {I} `{Callable I} {A B C D} (c : orec I A B C) (f : C → orec I A B D) : orec I A B D :=
   match c with
   | _ret x => f x
   | _rec x κ => _rec x (λ y, _bind (κ y) f)
-  | _call g x κ => _call g x (λ y, _bind (κ y) f)
+  | _call i x κ => _call i x (λ y, _bind (κ y) f)
   | undefined => undefined
   end.
 
-Notation "∇ x , B" :=
-  (∀ x, orec _ (λ x, B) B)
+Notation "∇ x , I ⇒ B" :=
+  (∀ x, orec I _ (λ x, B) B)
   (x binder, at level 200).
-
-Notation "A ⇀ B" :=
-  (∇ (_ : A), B)
-  (at level 199).
 
 #[local] Notation "t ∙1" := (proj1_sig t) (at level 20).
 #[local] Notation "⟨ x ⟩" := (exist _ x _) (only parsing).
@@ -112,9 +108,9 @@ Notation "A ⇀ B" :=
 
 Section Lib.
 
-  Context {A B} (f : ∇ (x : A), B x).
+  Context {I} `{Callable I} {A B} (f : ∇ (x : A), I ⇒ B x).
 
-  Inductive orec_graph {a} : orec A B (B a) → B a → Prop :=
+  Inductive orec_graph {a} : orec I A B (B a) → B a → Prop :=
   | ret_graph :
       ∀ x,
         orec_graph (_ret x) x
@@ -126,15 +122,15 @@ Section Lib.
         orec_graph (_rec x κ) w
 
   | call_graph :
-      ∀ F g hg x κ v w,
-        pgraph g x v →
+      ∀ i x κ v w,
+        cgraph i x v →
         orec_graph (κ v) w →
-        orec_graph (_call (F := F) g (hf := hg) x κ) w.
+        orec_graph (_call i x κ) w.
 
   Definition graph x v :=
     orec_graph (f x) v.
 
-  Inductive orec_graphT {a} : orec A B (B a) → B a → Type :=
+  Inductive orec_graphT {a} : orec I A B (B a) → B a → Type :=
   | ret_graphT :
       ∀ x,
         orec_graphT (_ret x) x
@@ -146,15 +142,15 @@ Section Lib.
         orec_graphT (_rec x κ) w
 
   | call_graphT :
-      ∀ F g hg x κ v w,
-        pgraph g x v →
+      ∀ i x κ v w,
+        cgraph i x v →
         orec_graphT (κ v) w →
-        orec_graphT (_call (F := F) g (hf := hg) x κ) w.
+        orec_graphT (_call i x κ) w.
 
   Definition graphT x v :=
     orec_graphT (f x) v.
 
-  Inductive orec_lt {a} : A → orec A B (B a) → Prop :=
+  Inductive orec_lt {a} : A → orec I A B (B a) → Prop :=
   | top_lt :
       ∀ x κ,
         orec_lt x (_rec x κ)
@@ -166,10 +162,10 @@ Section Lib.
         orec_lt y (_rec x κ)
 
   | call_lt :
-      ∀ F g hg x κ v y,
-        pgraph g x v →
+      ∀ i x κ v y,
+        cgraph i x v →
         orec_lt y (κ v) →
-        orec_lt y (_call (F := F) g (hf := hg) x κ).
+        orec_lt y (_call i x κ).
 
   Definition partial_lt x y :=
     orec_lt x (f y).
@@ -195,7 +191,7 @@ Section Lib.
       subst. apply IHhv2. assumption.
     - depelim hw.
       assert (v = v0).
-      { apply pgraph_fun. all: assumption. }
+      { apply cgraph_fun. all: assumption. }
       subst. apply IHhv. assumption.
   Qed.
 
@@ -228,14 +224,14 @@ Section Lib.
         apply IHh2. assumption.
     - depelim hlt.
       assert (v = v0).
-      { eapply pgraph_fun. all: eassumption. }
+      { eapply cgraph_fun. all: eassumption. }
       subst.
       apply IHh. assumption.
   Qed.
 
   (* Fuel version *)
 
-  Fixpoint orec_fuel_inst {a} n (e : orec A B (B a)) (r : ∀ x, Fueled (B x)) :=
+  Fixpoint orec_fuel_inst {a} n (e : orec I A B (B a)) (r : ∀ x, Fueled (B x)) :=
     match e with
     | _ret v => Success v
     | _rec x κ =>
@@ -245,7 +241,7 @@ Section Lib.
       | Undefined => Undefined
       end
     | _call g x κ =>
-      match pfueled g n x with
+      match cfueled g n x with
       | Success v => orec_fuel_inst n (κ v) r
       | NotEnoughFuel => NotEnoughFuel
       | Undefined => Undefined
@@ -266,21 +262,21 @@ Section Lib.
   (* We show the fueled version is sound with respect to the graph *)
 
   Lemma orec_fuel_inst_graph :
-    ∀ a n (o : orec _ _ (_ a)) r v,
+    ∀ a n (o : orec _ _ _ (_ a)) r v,
       orec_fuel_inst n o r = Success v →
       (∀ x w, r x = Success w → graph x w) →
       orec_graph o v.
   Proof.
     intros a n o r v e hr.
-    induction o as [w | x κ ih | G g hg x κ ih |] in v, e |- *.
+    induction o as [w | x κ ih | i x κ ih |] in v, e |- *.
     - simpl in e. noconf e. constructor.
     - simpl in e. destruct r as [w | |] eqn:e'. 2,3: discriminate.
       econstructor.
       + eapply hr. eassumption.
       + apply ih. assumption.
-    - simpl in e. destruct pfueled as [w | |] eqn:e'. 2,3: discriminate.
+    - simpl in e. destruct cfueled as [w | |] eqn:e'. 2,3: discriminate.
       econstructor.
-      + eapply pfueled_graph. eassumption.
+      + eapply cfueled_graph. eassumption.
       + apply ih. assumption.
     - discriminate.
   Qed.
@@ -359,7 +355,7 @@ Section Lib.
         apply IHh2. assumption.
     - depelim h'.
       assert (v = v0).
-      { eapply pgraph_fun. all: eassumption. }
+      { eapply cgraph_fun. all: eassumption. }
       subst.
       apply IHh. assumption.
   Qed.
@@ -384,22 +380,22 @@ Section Lib.
   Definition image x :=
     { v | graph x v }.
 
-  Definition oimage {a} (o : orec A B (B a)) :=
+  Definition oimage {a} (o : orec I A B (B a)) :=
     { v | orec_graph o v }.
 
-  Definition orec_domain {a} (o : orec A B (B a)) :=
+  Definition orec_domain {a} (o : orec I A B (B a)) :=
     ∃ v, orec_graph o v.
 
-  Definition oimageT {a} (o : orec A B (B a)) :=
+  Definition oimageT {a} (o : orec I A B (B a)) :=
     { v & orec_graphT o v }.
 
-  Equations? orec_inst {a} (e : orec A B (B a)) (de : orec_domain e)
+  Equations? orec_inst {a} (e : orec I A B (B a)) (de : orec_domain e)
     (da : domain a)
     (ha : ∀ x, orec_lt x e → partial_lt x a)
     (r : ∀ y, domain y → partial_lt y a → oimageT (f y)) : oimageT e :=
     orec_inst (_ret v) de da ha r := (v ; _) ;
     orec_inst (_rec x κ) de da ha r := (((orec_inst (κ (projT1 (r x _ _))) _ _ _ r)).1 ; _) ;
-    orec_inst (_call g x κ) de da ha r := ((orec_inst (κ (pdef g x _)) _ _ _ r).1 ; _) ;
+    orec_inst (_call g x κ) de da ha r := ((orec_inst (κ (cdef g x _)) _ _ _ r).1 ; _) ;
     orec_inst undefined de da ha r := False_rect _ _.
   Proof.
     - constructor.
@@ -422,31 +418,31 @@ Section Lib.
     - destruct de as [v hg]. depelim hg.
       eexists. eassumption.
     - lazymatch goal with
-      | |- context [ pdef g x ?prf ] => set (hh := prf) ; clearbody hh
+      | |- context [ cdef g x ?prf ] => set (hh := prf) ; clearbody hh
       end.
       destruct de as [v hg]. depelim hg. simpl in *.
-      pose proof (pdef_graph g x hh) as hg'.
-      move hg' at top. eapply pgraph_fun in hg'. 2: eassumption.
+      pose proof (cdef_graph x hh) as hg'.
+      move hg' at top. eapply cgraph_fun in hg'. 2: eassumption.
       subst. eexists. eassumption.
     - lazymatch goal with
-      | h : context [ pdef g x ?prf ] |- _ =>
+      | h : context [ cdef g x ?prf ] |- _ =>
           set (hh := prf) in h ; clearbody hh
       end.
       apply ha. econstructor. 2: eassumption.
-      apply pdef_graph.
+      apply cdef_graph.
     - destruct orec_inst. simpl.
       lazymatch goal with
-      | h : context [ pdef g x ?prf ] |- _ =>
+      | h : context [ cdef g x ?prf ] |- _ =>
           set (hh := prf) in h ; clearbody hh
       end.
       econstructor. 2: eassumption.
-      apply pdef_graph.
+      apply cdef_graph.
     - destruct de as [v hg]. depelim hg.
   Defined.
 
-  #[derive(equations=no)]Equations def_p (x : A) (h : domain x) : oimageT (f x)
+  #[derive(equations=no)] Equations def_p (x : A) (h : domain x) : oimageT (f x)
     by wf x partial_lt :=
-    def_p x h := orec_inst (a := x) (f x) h h (fun x Hx => Hx) (λ y hy hr, def_p y hy).
+    def_p x h := orec_inst (a := x) (f x) h h (λ x Hx, Hx) (λ y hy hr, def_p y hy).
 
   Definition def x h :=
     (def_p x h).1.
@@ -467,10 +463,12 @@ Section Lib.
     intros x v h.
     unshelve epose proof (def_p x _) as [v' hT].
     1: eexists ; eassumption.
-    enough (v = v') as -> by assumption.
-    eapply orec_graph_functional.
-    - eassumption.
-    - apply orec_graphT_graph. assumption.
+    assert (v = v').
+    { eapply orec_graph_functional.
+      - eassumption.
+      - apply orec_graphT_graph. assumption.
+    }
+    subst. assumption.
   Qed.
 
   (* Well-founded version with automatic domain inferrence *)
@@ -487,7 +485,7 @@ Section Lib.
     match o with
     | _ret v => post a v
     | _rec x κ => pre x ∧ ∀ v, post x v → orec_ind_step a pre post (κ v)
-    | _call g x κ => ∀ v, pgraph g x v → orec_ind_step a pre post (κ v)
+    | _call g x κ => ∀ v, cgraph g x v → orec_ind_step a pre post (κ v)
     | undefined => True
     end.
 
@@ -505,7 +503,7 @@ Section Lib.
       post x v.
   Proof.
     intros pre post x o v hind h hpre hgraph.
-    induction hgraph as [w | x y κ v w hy ihy hκ ihκ | x G g hg y κ v w hy hκ ihκ].
+    induction hgraph as [w | x y κ v w hy ihy hκ ihκ | x i y κ v w hy hκ ihκ].
     all: cbn in *.
     - assumption.
     - destruct h as [hpy hv].
@@ -563,7 +561,7 @@ Section Lib.
     match o with
     | _ret v => post a v
     | _rec x κ => pre x * ∀ v, post x v → orec_ind_stepT a pre post (κ v)
-    | _call g x κ => ∀ v, pgraph g x v → orec_ind_stepT a pre post (κ v)
+    | _call g x κ => ∀ v, cgraph g x v → orec_ind_stepT a pre post (κ v)
     | undefined => True
     end%type.
 
@@ -579,7 +577,7 @@ Section Lib.
       post x v.
   Proof.
     intros pre post x y v hind h hpre hgraph.
-    induction hgraph as [w | x y κ v w hy ihy hκ ihκ | x G g hg y κ v w hy hκ ihκ].
+    induction hgraph as [w | x y κ v w hy ihy hκ ihκ | x i y κ v w hy hκ ihκ].
     all: cbn in *.
     - assumption.
     - destruct h as [hpy hv].
@@ -630,21 +628,21 @@ Section Lib.
 
   (* Computing the domain, easier than using the graph *)
 
-  Fixpoint comp_domain {a} (o : orec A B a) :=
+  Fixpoint comp_domain {a} (o : orec I A B a) :=
     match o with
     | _ret v => True
     | _rec x κ => domain x ∧ ∀ v, graph x v → comp_domain (κ v)
-    | _call g x κ => pdomain g x ∧ ∀ v, pgraph g x v → comp_domain (κ v)
+    | _call g x κ => cdomain g x ∧ ∀ v, cgraph g x v → comp_domain (κ v)
     | undefined => False
     end.
 
   Lemma comp_domain_orec_domain :
-    ∀ a (o : orec A B (B a)),
+    ∀ a (o : orec I A B (B a)),
       comp_domain o →
       orec_domain o.
   Proof.
     intros a o h.
-    induction o as [w | x κ ih | G g hg x κ ih |] in h |- *.
+    induction o as [w | x κ ih | i x κ ih |] in h |- *.
     - eexists. constructor.
     - simpl in h. destruct h as [[v hx] hκ].
       specialize (hκ v hx). apply ih in hκ. destruct hκ as [w h].
@@ -668,6 +666,73 @@ Section Lib.
 
 End Lib.
 
+(** To be able to compose partial functions, we use a special instance for
+    the Callable class. It comes at the cost of having to have types directly
+    in the data structure which means making the universe level grow. In most
+    cases it should not matter however.
+*)
+
+Class PFun {F} (f : F) := {
+  psrc : Type ;
+  ptgt : psrc → Type ;
+  pgraph : ∀ x, ptgt x → Prop ;
+  pdomain x := ∃ v, pgraph x v ;
+  pgraph_fun : ∀ x v w, pgraph x v → pgraph x w → v = w ;
+  pfueled : nat → ∀ x, Fueled (ptgt x) ;
+  pfueled_graph : ∀ n x v, pfueled n x = Success v → pgraph x v ;
+  pdef : ∀ x, pdomain x → ptgt x ;
+  pdef_graph : ∀ x h, pgraph x (pdef x h)
+}.
+
+Arguments psrc {F} f {_}.
+Arguments ptgt {F} f {_}.
+Arguments pgraph {F} f {_}.
+Arguments pdomain {F} f {_}.
+Arguments pgraph_fun {F} f {_}.
+Arguments pfueled {F} f {_}.
+Arguments pfueled_graph {F} f {_}.
+Arguments pdef {F} f {_}.
+Arguments pdef_graph {F} f {_}.
+
+(* Packed PFun *)
+Record PPFun := {
+  pfun_ty : Type ;
+  pfun : pfun_ty ;
+  ispfun : PFun pfun
+}.
+
+Arguments  pfun_ty _ : clear implicits.
+Arguments  pfun _ : clear implicits.
+
+#[export] Existing Instance ispfun.
+
+Definition PPFun_mk {F} (f : F) `{PFun _ f} := {|
+  pfun_ty := F ;
+  pfun := f ;
+  ispfun := _
+|}.
+
+#[export, refine] Instance CallablePPFun : Callable PPFun := {|
+  csrc i := psrc (pfun i) ;
+  ctgt i := ptgt (pfun i) ;
+  cgraph i := pgraph (pfun i) ;
+  cfueled i := pfueled (pfun i) ;
+  cdef i := pdef (pfun i)
+|}.
+Proof.
+  - intros. eapply pgraph_fun. all: eassumption.
+  - intro. apply pfueled_graph.
+  - intro. apply pdef_graph.
+Defined.
+
+Notation "∇ x , B" :=
+  (∇ x, PPFun ⇒ B)
+  (x binder, at level 200).
+
+Notation "A ⇀ B" :=
+  (∇ (_ : A), B)
+  (at level 199).
+
 (* We can provide an instance for all partial functions defined as above. *)
 #[export, refine] Instance pfun_gen A B (f : ∇ (x : A), B x) : PFun f := {|
   psrc := A ;
@@ -686,30 +751,37 @@ Defined.
 Notation "f @ x" := (autodef f x) (at level 10).
 
 (* orec is a monad *)
-#[export] Instance MonadOrec {A B} : Monad (orec A B) := {|
+#[export] Instance MonadOrec {I} `{Callable I} {A B} : Monad (orec I A B) := {|
   ret C x := _ret x ;
   bind C D c f := _bind c f
 |}.
 
 (* It has some actions *)
-Definition rec {A B} (x : A) : orec A B (B x) :=
+Definition rec {I} `{Callable I} {A B} (x : A) : orec I A B (B x) :=
   _rec x (λ y, ret y).
 
-Definition call {A B} {F} f `{PFun F f} (x : psrc f) : orec A B (ptgt f x) :=
+Definition ext_call {I} `{Callable I} {A B} f (x : csrc f) : orec I A B (ctgt x) :=
   _call f x (λ y, ret y).
+
+Definition call {A B} {F} f `{PFun F f} (x : psrc f) : orec PPFun A B (ptgt f x) :=
+  ext_call (PPFun_mk f) x.
 
 (* Combining orec with other effects (rather constrained) *)
 
 Class OrecEffect (M : Type → Type) := {
   (* combined : ∀  (A : Type) (B : A → Type) (C : Type), Type ; *)
-  combined A B C := orec A B (M C) ;
-  combined_monad : ∀ A B, Monad (combined A B)
+  combined I `{Callable I} A B C := orec I A B (M C) ;
+  combined_monad : ∀ I `{Callable I} A B, Monad (combined I A B)
 }.
 
 (* Typeclasses Opaque combined. *)
 
+Notation "∇ x , I ⇒ M ♯ B" :=
+  (∀ x, combined (M := M) I _ (λ x, M B) B)
+  (x binder, at level 200).
+
 Notation "∇ x , M ♯ B" :=
-  (∀ x, combined (M := M) _ (λ x, M B) B)
+  (∀ x, combined (M := M) PPFun _ (λ x, M B) B)
   (x binder, at level 200).
 
 (* PFun instance for effectful partial functions *)
