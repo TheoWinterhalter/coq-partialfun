@@ -102,6 +102,62 @@ Equations test_n : ∇ (n : nat), bool :=
 
 Eval lazy in linear_search test_n @ 0.
 
+(* Abstracting away some of the callable structure. *)
+
+Class CallTypes I := {
+  ct_src : I → Type ;
+  ct_tgt : ∀ (i : I), ct_src i → Type
+}.
+
+Class CallableProps {I} (CT : CallTypes I) := {
+  cp_graph : ∀ (i : I) (x : ct_src i), ct_tgt i x → Prop ;
+  cp_domain i x := ∃ v, cp_graph i x v ;
+  cp_graph_fun : ∀ i x v w, cp_graph i x v → cp_graph i x w → v = w ;
+  cp_fueled i : nat → ∀ x, Fueled (ct_tgt i x) ;
+  cp_fueled_graph i : ∀ n x v, cp_fueled i n x = Success v → cp_graph i x v ;
+  cp_def i : ∀ x, cp_domain i x → ct_tgt i x ;
+  cp_def_graph i : ∀ x h, cp_graph i x (cp_def i x h)
+}.
+
+#[export] Instance CallableSplit I (CT : CallTypes I) `(CallableProps I) : Callable I := {|
+  csrc := ct_src ;
+  ctgt := ct_tgt ;
+  cgraph := cp_graph ;
+  cgraph_fun := cp_graph_fun ;
+  cfueled := cp_fueled ;
+  cfueled_graph := cp_fueled_graph ;
+  cdef := cp_def ;
+  cdef_graph := cp_def_graph
+|}.
+
+Section Split.
+
+  Let I := bool.
+
+  Instance CallTypesExample : CallTypes I := {|
+    ct_src (b : I) := if b then nat else unit ;
+    ct_tgt b := if b then λ n, { m | n = m } else λ _, unit
+  |}.
+
+  Context {CP : CallableProps _}.
+
+  Let f := true.
+  Let g := false.
+
+  (* Somehow, Coq really wants to infer the Monad with PPFun *)
+  Equations try_split : ∇ (n : nat), I ⇒ nat :=
+    try_split n :=
+      (* m ← ext_call f n ;;
+      ext_call g tt ;;
+      ret 0. *)
+      bind (M := orec I _ _) (ext_call f n) (λ '(exist _ m h),
+        bind (M := orec I _ _) (ext_call g tt) (λ _,
+          ret m
+        )
+      ).
+
+End Split.
+
 (* Example: Untyped λ-calculus *)
 
 Inductive term : Type :=

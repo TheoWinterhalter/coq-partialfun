@@ -702,8 +702,8 @@ Record PPFun := {
   ispfun : PFun pfun
 }.
 
-Arguments  pfun_ty _ : clear implicits.
-Arguments  pfun _ : clear implicits.
+Arguments pfun_ty _ : clear implicits.
+Arguments pfun _ : clear implicits.
 
 #[export] Existing Instance ispfun.
 
