@@ -522,7 +522,7 @@ Arguments raise {E M _ A} e.
 #[local] Instance OrecEffectExn E : OrecEffect (exn E).
 Proof.
   constructor.
-  intros A B. apply MonadExnT.
+  intros I H A B. apply MonadExnT.
 Defined.
 
 #[export] Existing Instance combined_monad.
@@ -570,16 +570,16 @@ Proof.
     + assumption.
 Qed.
 
-(* Now combining effects *)
+(* Now combining effects (for now only with PPFun) *)
 
-Definition lift_pure {A B C E} `{OrecEffect E} (x : C) : combined A B C :=
+Definition lift_pure {A B C E} `{OrecEffect E} (x : C) : combined  PPFun A B C :=
   ret x.
 
-Definition lift_call {A B C F} f `{PFun F f} (x : psrc f) g : orec A B C :=
-  _call f x (λ y, g y).
+Definition lift_call {A B C F} f `{PFun F f} (x : psrc f) g : orec PPFun A B C :=
+  y ← call f x ;; g y.
 
 Class OrecLift A B C D := {
-  orec_lift : D → orec A B C
+  orec_lift : D → orec PPFun A B C
 }.
 
 Definition OrecLiftPure A B C E `{OrecEffect E} : OrecLift A B (E C) C := {|
@@ -605,7 +605,7 @@ Definition OrecLiftId A B C : OrecLift A B C C := {|
   : typeclass_instances.
 
 Definition eff_call {A B C F} f `{PFun F f} (x : psrc f) `{OrecLift A B C (ptgt f x)} :
-  orec A B C :=
+  orec PPFun A B C :=
   lift_call f x orec_lift.
 
 Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
