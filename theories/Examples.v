@@ -12,6 +12,7 @@ Set Polymorphic Inductive Cumulativity.
 
 (* Small examples *)
 
+(* Implements ceiling of division *)
 Equations div : ∇ (p : nat * nat), nat :=
   div (0, m) := ret 0 ;
   div (n, m) := S <*> rec (n - m, m).
@@ -80,6 +81,26 @@ Proof.
   split. 2: auto.
   apply div_domain. assumption.
 Qed.
+
+(* Abstract partial functions *)
+
+Section AbstractFun.
+
+  Context (f : ∇ (n : nat), bool).
+
+  Equations linear_search : ∇ (n : nat), nat :=
+    linear_search n :=
+      b ← call f n ;;
+      if b
+      then ret n
+      else rec (S n).
+
+End AbstractFun.
+
+Equations test_n : ∇ (n : nat), bool :=
+  test_n n := q ← call div (n, 2) ;; ret (q =? 3).
+
+Eval lazy in linear_search test_n @ 0.
 
 (* Example: Untyped λ-calculus *)
 
