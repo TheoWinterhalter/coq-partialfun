@@ -21,6 +21,7 @@ Set Polymorphic Inductive Cumulativity.
   - Better support for monads by having orec be a monad transformer?
   - Have scopes or even modules for notations.
   - Better class for autodef.
+  - Fix extraction, maybe by doing things manually instead of using Equations?
 
 *)
 
