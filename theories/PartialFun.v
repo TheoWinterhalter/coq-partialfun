@@ -32,12 +32,16 @@ Set Polymorphic Inductive Cumulativity.
 
 (* A class of true booleans *)
 
-Class IsTrue (b : bool) := {
+Class IsTrue (b : bool) := mk_is_true {
   is_true : b = true
 }.
 
-#[export] Hint Extern 1 (IsTrue ?b) =>
+(* #[export] Hint Extern 1 (IsTrue ?b) =>
   constructor ; reflexivity
+  : typeclass_instances. *)
+
+#[export] Hint Extern 1000 (IsTrue ?b) =>
+  vm_cast_no_check (mk_is_true b eq_refl)
   : typeclass_instances.
 
 (* Specific to fuel implementations *)
