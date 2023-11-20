@@ -144,17 +144,15 @@ Section Split.
   Let f := true.
   Let g := false.
 
+  (* Redundant but needed?? *)
+  Instance MonadOrec_I {A B} : Monad (orec I A B) := _.
+
   (* Somehow, Coq really wants to infer the Monad with PPFun *)
   Equations try_split : ∇ (n : nat), I ⇒ nat :=
     try_split n :=
-      (* m ← ext_call f n ;;
+      m ← ext_call f n ;;
       ext_call g tt ;;
-      ret 0. *)
-      bind (M := orec I _ _) (ext_call f n) (λ '(exist _ m h),
-        bind (M := orec I _ _) (ext_call g tt) (λ _,
-          ret m
-        )
-      ).
+      ret 0.
 
 End Split.
 
