@@ -22,6 +22,7 @@ Set Polymorphic Inductive Cumulativity.
   - Have scopes or even modules for notations.
   - Better class for autodef.
   - Fix extraction, maybe by doing things manually instead of using Equations?
+  - Maybe use Hint Extern instead of instanced to better control Monad.
 
 *)
 
