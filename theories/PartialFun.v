@@ -101,7 +101,7 @@ Fixpoint _bind {I} `{Callable I} {A B C D} (c : orec I A B C) (f : C → orec I 
   end.
 
 Notation "∇ x , I ⇒ B" :=
-  (∀ x, orec I _ (λ x, B) B)
+  (∀ x, orec I _ (λ x, B%type) B)
   (x binder, at level 200).
 
 #[local] Notation "t ∙1" := (proj1_sig t) (at level 20).
@@ -783,11 +783,11 @@ Class OrecEffect (M : Type → Type) := {
 (* Typeclasses Opaque combined. *)
 
 Notation "∇ x , I ⇒ M ♯ B" :=
-  (∀ x, combined (M := M) I _ (λ x, M B) B)
+  (∀ x, combined (M := M) I _ (λ x, M%function B%type) B)
   (x binder, at level 200).
 
 Notation "∇ x , M ♯ B" :=
-  (∀ x, combined (M := M) PPFun _ (λ x, M B) B)
+  (∀ x, combined (M := M) PPFun _ (λ x, M%function B%type) B)
   (x binder, at level 200).
 
 (* PFun instance for effectful partial functions *)
