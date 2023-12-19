@@ -398,10 +398,10 @@ Section Lib.
   Equations? orec_inst {a} (e : orec I A B (B a)) (de : orec_domain e)
     (da : domain a)
     (ha : ∀ x, orec_lt x e → partial_lt x a)
-    (r : ∀ y, domain y → partial_lt y a → oimageT (f y)) : oimageT e :=
-    orec_inst (_ret v) de da ha r := (v ; _) ;
-    orec_inst (_rec x κ) de da ha r := (((orec_inst (κ (projT1 (r x _ _))) _ _ _ r)).1 ; _) ;
-    orec_inst (_call g x κ) de da ha r := ((orec_inst (κ (cdef g x _)) _ _ _ r).1 ; _) ;
+    (r : ∀ y, domain y → partial_lt y a → oimage (f y)) : oimage e :=
+    orec_inst (_ret v) de da ha r := ⟨ v ⟩ ;
+    orec_inst (_rec x κ) de da ha r := ⟨ ((orec_inst (κ ((r x _ _) ∙1)) _ _ _ r)) ∙1 ⟩ ;
+    orec_inst (_call g x κ) de da ha r := ⟨ (orec_inst (κ (cdef g x _)) _ _ _ r) ∙1 ⟩ ;
     orec_inst undefined de da ha r := False_rect _ _.
   Proof.
     - constructor.
@@ -411,13 +411,13 @@ Section Lib.
     - destruct de as [v hg]. depelim hg. simpl in *.
       destruct r as [w hw]. simpl.
       assert (w = v0).
-      { eapply orec_graph_functional. 1: eapply orec_graphT_graph.
+      { eapply orec_graph_functional.
         all: eassumption.
       }
       subst.
       eexists. eassumption.
     - apply ha. econstructor. 2: eassumption.
-      red. destruct r. apply orec_graphT_graph. assumption.
+      red. destruct r. assumption.
     - simpl. destruct orec_inst. simpl.
       econstructor. 2: eassumption.
       destruct r. assumption.
@@ -446,19 +446,85 @@ Section Lib.
     - destruct de as [v hg]. depelim hg.
   Defined.
 
-  #[derive(equations=no)] Equations def_p (x : A) (h : domain x) : oimageT (f x)
+  #[derive(equations=no)] Equations def_p (x : A) (h : domain x) : oimage (f x)
     by wf x partial_lt :=
     def_p x h := orec_inst (a := x) (f x) h h (λ x Hx, Hx) (λ y hy hr, def_p y hy).
 
+  Equations? orec_instT {a} (e : orec I A B (B a)) (de : orec_domain e)
+    (da : domain a)
+    (ha : ∀ x, orec_lt x e → partial_lt x a)
+    (r : ∀ y, domain y → partial_lt y a → oimageT (f y)) : oimageT e :=
+    orec_instT (_ret v) de da ha r := (v ; _) ;
+    orec_instT (_rec x κ) de da ha r := (((orec_instT (κ (projT1 (r x _ _))) _ _ _ r)).1 ; _) ;
+    orec_instT (_call g x κ) de da ha r := ((orec_instT (κ (cdef g x _)) _ _ _ r).1 ; _) ;
+    orec_instT undefined de da ha r := False_rect _ _.
+  Proof.
+    - constructor.
+    - eapply lt_preserves_domain. 1: eassumption.
+      apply ha. constructor.
+    - apply ha. constructor.
+    - destruct de as [v hg]. depelim hg. simpl in *.
+      destruct r as [w hw]. simpl.
+      assert (w = v0).
+      { eapply orec_graph_functional. 1: eapply orec_graphT_graph.
+        all: eassumption.
+      }
+      subst.
+      eexists. eassumption.
+    - apply ha. econstructor. 2: eassumption.
+      red. destruct r. apply orec_graphT_graph. assumption.
+    - simpl. destruct orec_instT. simpl.
+      econstructor. 2: eassumption.
+      destruct r. assumption.
+    - destruct de as [v hg]. depelim hg.
+      eexists. eassumption.
+    - lazymatch goal with
+      | |- context [ cdef g x ?prf ] => set (hh := prf) ; clearbody hh
+      end.
+      destruct de as [v hg]. depelim hg. simpl in *.
+      pose proof (cdef_graph x hh) as hg'.
+      move hg' at top. eapply cgraph_fun in hg'. 2: eassumption.
+      subst. eexists. eassumption.
+    - lazymatch goal with
+      | h : context [ cdef g x ?prf ] |- _ =>
+          set (hh := prf) in h ; clearbody hh
+      end.
+      apply ha. econstructor. 2: eassumption.
+      apply cdef_graph.
+    - destruct orec_instT. simpl.
+      lazymatch goal with
+      | h : context [ cdef g x ?prf ] |- _ =>
+          set (hh := prf) in h ; clearbody hh
+      end.
+      econstructor. 2: eassumption.
+      apply cdef_graph.
+    - destruct de as [v hg]. depelim hg.
+  Defined.
+
+  #[derive(equations=no)] Equations def_pT (x : A) (h : domain x) : oimageT (f x)
+    by wf x partial_lt :=
+    def_pT x h := orec_instT (a := x) (f x) h h (λ x Hx, Hx) (λ y hy hr, def_pT y hy).
+
   Definition def x h :=
-    (def_p x h).1.
+    (def_p x h) ∙1.
+
+  Definition defT x h :=
+    (def_pT x h).1.
 
   Lemma def_graph_sound :
     ∀ x h,
       graph x (def x h).
   Proof.
     intros x h.
-    unfold def. destruct def_p. apply orec_graphT_graph. assumption.
+    unfold def. destruct def_p. assumption.
+  Qed.
+
+  Lemma defT_graph_sound :
+    ∀ x h,
+      graph x (defT x h).
+  Proof.
+    intros x h.
+    unfold defT. destruct def_pT. apply orec_graphT_graph. assumption.
   Qed.
 
   Lemma orec_graph_graphT :
@@ -467,7 +533,7 @@ Section Lib.
       graphT x v.
   Proof.
     intros x v h.
-    unshelve epose proof (def_p x _) as [v' hT].
+    unshelve epose proof (def_pT x _) as [v' hT].
     1: eexists ; eassumption.
     assert (v = v').
     { eapply orec_graph_functional.
