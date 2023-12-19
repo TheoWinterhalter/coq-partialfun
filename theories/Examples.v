@@ -620,7 +620,6 @@ Definition OrecLiftPure A B C E `{OrecEffect E} : OrecLift A B (E C) C := {|
   let D' := eval simpl in D in
   constr_eq C D' ;
   eapply OrecLiftPure ; exact _
-  (* eapply (todo (E, C, D')) *)
   : typeclass_instances.
 
 Definition OrecLiftId A B C : OrecLift A B C C := {|
