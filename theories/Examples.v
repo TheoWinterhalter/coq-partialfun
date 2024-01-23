@@ -1,6 +1,6 @@
 From Equations Require Import Equations.
 From Coq Require Import Utf8 List Arith Lia.
-From PartialFun Require Import PartialFun Monad.
+From PartialFun Require Import  Monad PartialFun.
 
 Import ListNotations.
 Import MonadNotations.
@@ -9,6 +9,8 @@ Set Default Goal Selector "!".
 Set Equations Transparent.
 Set Universe Polymorphism.
 Set Polymorphic Inductive Cumulativity.
+
+Import PFUnInstances.
 
 (* Small examples *)
 
@@ -90,8 +92,8 @@ Section AbstractFun.
 
   Equations linear_search : ∇ (n : nat), nat :=
     linear_search n :=
-      b ← call f n ;;
-      if b
+      b ← call f n ;;[orec _ _ _]
+      if b (*: bool (* Why is this annotation needed *) *)
       then ret n
       else rec (S n).
 
@@ -104,32 +106,6 @@ Eval lazy in linear_search test_n @ 0.
 
 (* Abstracting away some of the callable structure. *)
 
-Class CallTypes I := {
-  ct_src : I → Type ;
-  ct_tgt : ∀ (i : I), ct_src i → Type
-}.
-
-Class CallableProps {I} (CT : CallTypes I) := {
-  cp_graph : ∀ (i : I) (x : ct_src i), ct_tgt i x → Prop ;
-  cp_domain i x := ∃ v, cp_graph i x v ;
-  cp_graph_fun : ∀ i x v w, cp_graph i x v → cp_graph i x w → v = w ;
-  cp_fueled i : nat → ∀ x, Fueled (ct_tgt i x) ;
-  cp_fueled_graph i : ∀ n x v, cp_fueled i n x = Success v → cp_graph i x v ;
-  cp_def i : ∀ x, cp_domain i x → ct_tgt i x ;
-  cp_def_graph i : ∀ x h, cp_graph i x (cp_def i x h)
-}.
-
-#[export] Instance CallableSplit I (CT : CallTypes I) `(CallableProps I) : Callable I := {|
-  csrc := ct_src ;
-  ctgt := ct_tgt ;
-  cgraph := cp_graph ;
-  cgraph_fun := cp_graph_fun ;
-  cfueled := cp_fueled ;
-  cfueled_graph := cp_fueled_graph ;
-  cdef := cp_def ;
-  cdef_graph := cp_def_graph
-|}.
-
 Section Split.
 
   Let I := bool.
@@ -139,15 +115,12 @@ Section Split.
     ct_tgt b := if b then λ n, { m | n = m } else λ _, unit
   |}.
 
-  Context {CP : CallableProps _}.
+  Context {CP : CallableProps CallTypesExample}.
+  #[local] Existing Instance CallableSplit.
 
   Let f := true.
   Let g := false.
 
-  (* Redundant but needed?? *)
-  Instance MonadOrec_I {A B} : Monad (orec I A B) := _.
-
-  (* Somehow, Coq really wants to infer the Monad with PPFun *)
   Equations try_split : ∇ (n : nat), I ⇒ nat :=
     try_split n :=
       m ← ext_call f n ;;
@@ -553,9 +526,12 @@ Qed.
 *)
 
 Require Import MonadExn.
+Import MonadExn.ExportInstance.
 
 Inductive error :=
 | DivisionByZero.
+
+#[local] Existing Instance combined_monad.
 
 Equations ediv : ∇ (p : nat * nat), exn error ♯ nat :=
   ediv (n, 0) := raise DivisionByZero ;
@@ -602,7 +578,7 @@ Qed.
 
 (* Now combining effects (for now only with PPFun) *)
 
-Definition lift_pure {A B C E} `{OrecEffect E} (x : C) : combined  PPFun A B C :=
+Definition lift_pure {A B C E} `{OrecEffect E} (x : C) : combined_orec E PPFun A B C :=
   ret x.
 
 Definition lift_call {A B C F} f `{PFun F f} (x : psrc f) g : orec PPFun A B C :=
@@ -611,6 +587,8 @@ Definition lift_call {A B C F} f `{PFun F f} (x : psrc f) g : orec PPFun A B C :
 Class OrecLift A B C D := {
   orec_lift : D → orec PPFun A B C
 }.
+
+#[export] Hint Mode OrecLift ! ! ! ! : typeclass_instances.
 
 Definition OrecLiftPure A B C E `{OrecEffect E} : OrecLift A B (E C) C := {|
   orec_lift := lift_pure
@@ -627,8 +605,8 @@ Definition OrecLiftId A B C : OrecLift A B C C := {|
 |}.
 
 #[export] Hint Extern 20 (OrecLift ?A ?B ?C ?D) =>
-  let C' := eval simpl in C in
-  let D' := eval simpl in D in
+  let C' := eval cbn in C in
+  let D' := eval cbn in D in
   unify C' D' ;
   eapply OrecLiftId ; exact _
   : typeclass_instances.
@@ -640,8 +618,13 @@ Definition eff_call {A B C F} f `{PFun F f} (x : psrc f) `{OrecLift A B C (ptgt 
 Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
   test_ediv (n, m) := q ← call ediv (n, m) ;; ret (q * m =? n).
 
+(* #[local]
+Hint Extern 0 (Monad (orec PPFun ?A ?B (ptgt ?f ?x))) => 
+  let R := eval cbn in (ptgt f x) in exact (_ : Monad (orec PPFun A B R)) 
+  : typeclass_instances. *)
+
 Equations compare_div : ∇ (p : nat * nat), exn error ♯ bool :=
   compare_div (n, m) :=
-    q ← eff_call ediv (n, m) ;;
+    q ← eff_call ediv (n, m) ;;[combined_orec _ _ _ _]
     q' ← eff_call div (n, m) ;;
     ret (q =? q').
