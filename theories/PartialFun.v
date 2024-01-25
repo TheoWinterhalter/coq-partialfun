@@ -446,7 +446,43 @@ Section Lib.
   Definition oimageT {a} (o : orec I A B (B a)) :=
     { v & orec_graphT o v }.
 
-  Equations? orec_inst {a} (e : orec I A B (B a)) (de : orec_domain e)
+
+  (* The calls to depelim in orec_inst create a lot of universes
+     That's probably a bug/shortcoming of equation but for now
+     we derive explicitly the two inversion principles that are required.
+   *)
+  Lemma orec_graph_rec_inv {a x κ} {w : B a} (e : orec_graph (_rec x κ) w) :
+    ∃ v, orec_graph (f x) v ∧ orec_graph (κ v) w.
+  Proof.
+    refine (match e in orec_graph m r return
+                  match m with
+                  | _rec x κ => ∃ v, orec_graph (f x) v ∧ orec_graph (κ v) r
+                  | _ => True
+                  end
+            with
+            | rec_graph _ _ _ _ _ _ => _
+            | _ => _
+            end); try constructor.
+    eexists; split; eassumption.
+  Qed.
+
+  Lemma orec_graph_call_inv {g a x κ} {w : B a} (e : orec_graph (_call g x κ) w) :
+    ∃ v, cp_graph g x v ∧ orec_graph (κ v) w.
+  Proof.
+    refine (match e in orec_graph m r return
+                  match m with
+                  | _call g x κ => ∃ v, cp_graph g x v ∧ orec_graph (κ v) r
+                  | _ => True
+                  end
+            with
+            | call_graph _ _ _ _ _ _ _ => _
+            | _ => _
+            end); try constructor.
+    eexists; split; eassumption.
+  Qed.
+
+  (* orec_inst should no introduce any universe, but we cannot specify it because of Equations *)
+  Equations? orec_inst@{+} {a} (e : orec I A B (B a)) (de : orec_domain e)
     (da : domain a)
     (ha : ∀ x, orec_lt x e → partial_lt x a)
     (r : ∀ y, domain y → partial_lt y a → oimage (f y)) : oimage e :=
@@ -459,7 +495,9 @@ Section Lib.
     - eapply lt_preserves_domain. 1: eassumption.
       apply ha. constructor.
     - apply ha. constructor.
-    - destruct de as [v hg]. depelim hg. simpl in *.
+    - destruct de as [v hg].
+      pose proof (orec_graph_rec_inv hg) as (v0&?&?).
+      simpl in *.
       destruct r as [w hw]. simpl.
       assert (w = v0).
       { eapply orec_graph_functional.
@@ -472,16 +510,19 @@ Section Lib.
     - simpl. destruct orec_inst. simpl.
       econstructor. 2: eassumption.
       destruct r. assumption.
-    - destruct de as [v hg]. depelim hg.
+    - destruct de as [v hg].
+      pose proof (orec_graph_call_inv hg) as (?&?&?).
       eexists. eassumption.
     - lazymatch goal with
       | |- context [ cp_def g x ?prf ] => set (hh := prf) ; clearbody hh
       end.
-      destruct de as [v hg]. depelim hg. simpl in *.
+      destruct de as [v hg].
+      pose proof (orec_graph_call_inv hg) as (?&?&?).
+      simpl in *.
       pose proof (cp_def_graph x hh) as hg'.
       move hg' at top. eapply cp_graph_fun in hg'. 2: eassumption.
       subst. eexists. eassumption.
-    - lazymatch goal with
+    - intros; lazymatch goal with
       | h : context [ cp_def g x ?prf ] |- _ =>
           set (hh := prf) in h ; clearbody hh
       end.
@@ -494,7 +535,7 @@ Section Lib.
       end.
       econstructor. 2: eassumption.
       apply cp_def_graph.
-    - destruct de as [v hg]. depelim hg.
+    - destruct de as [v hg]. inversion hg.
   Defined.
 
   #[derive(equations=no),tactic=idtac] Equations? def_p (x : A) (h : domain x) : oimage (f x)
@@ -502,7 +543,9 @@ Section Lib.
     def_p x h := orec_inst (a := x) (f x) h h (λ x Hx, Hx) (λ y hy hr, def_p y hy).
   Proof. exact hr. Defined.
 
-  Equations? orec_instT {a} (e : orec I A B (B a)) (de : orec_domain e)
+
+  (* Same as for orec_inst, there should be no universe parameter here *)
+  Equations? orec_instT@{+} {a} (e : orec I A B (B a)) (de : orec_domain e)
     (da : domain a)
     (ha : ∀ x, orec_lt x e → partial_lt x a)
     (r : ∀ y, domain y → partial_lt y a → oimageT (f y)) : oimageT e :=
@@ -515,7 +558,9 @@ Section Lib.
     - eapply lt_preserves_domain. 1: eassumption.
       apply ha. constructor.
     - apply ha. constructor.
-    - destruct de as [v hg]. depelim hg. simpl in *.
+    - destruct de as [v hg].
+      pose proof (orec_graph_rec_inv hg) as (v0&?&?).
+      simpl in *.
       destruct r as [w hw]. simpl.
       assert (w = v0).
       { eapply orec_graph_functional. 1: eapply orec_graphT_graph.
@@ -528,12 +573,15 @@ Section Lib.
     - simpl. destruct orec_instT. simpl.
       econstructor. 2: eassumption.
       destruct r. assumption.
-    - destruct de as [v hg]. depelim hg.
+    - destruct de as [v hg].
+      pose proof (orec_graph_call_inv hg) as (?&?&?).
       eexists. eassumption.
     - lazymatch goal with
       | |- context [ cp_def g x ?prf ] => set (hh := prf) ; clearbody hh
       end.
-      destruct de as [v hg]. depelim hg. simpl in *.
+      destruct de as [v hg].
+      pose proof (orec_graph_call_inv hg) as (?&?&?).
+      simpl in *.
       pose proof (cp_def_graph x hh) as hg'.
       move hg' at top. eapply cp_graph_fun in hg'. 2: eassumption.
       subst. eexists. eassumption.
@@ -550,7 +598,7 @@ Section Lib.
       end.
       econstructor. 2: eassumption.
       apply cp_def_graph.
-    - destruct de as [v hg]. depelim hg.
+    - destruct de as [v hg]. inversion hg.
   Defined.
 
   #[derive(equations=no)] Equations def_pT (x : A) (h : domain x) : oimageT (f x)
