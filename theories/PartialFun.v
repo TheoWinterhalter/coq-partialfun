@@ -452,11 +452,11 @@ Section Lib.
      we derive explicitly the two inversion principles that are required.
    *)
   Lemma orec_graph_rec_inv {a x κ} {w : B a} (e : orec_graph (_rec x κ) w) :
-    exists v, orec_graph (f x) v /\ orec_graph (κ v) w.
+    ∃ v, orec_graph (f x) v ∧ orec_graph (κ v) w.
   Proof.
     refine (match e in orec_graph m r return
                   match m with
-                  | _rec x κ => exists v, orec_graph (f x) v /\ orec_graph (κ v) r
+                  | _rec x κ => ∃ v, orec_graph (f x) v ∧ orec_graph (κ v) r
                   | _ => True
                   end
             with
@@ -467,11 +467,11 @@ Section Lib.
   Qed.
 
   Lemma orec_graph_call_inv {g a x κ} {w : B a} (e : orec_graph (_call g x κ) w) :
-    exists v, cp_graph g x v /\ orec_graph (κ v) w.
+    ∃ v, cp_graph g x v ∧ orec_graph (κ v) w.
   Proof.
     refine (match e in orec_graph m r return
                   match m with
-                  | _call g x κ => exists v, cp_graph g x v /\ orec_graph (κ v) r
+                  | _call g x κ => ∃ v, cp_graph g x v ∧ orec_graph (κ v) r
                   | _ => True
                   end
             with
