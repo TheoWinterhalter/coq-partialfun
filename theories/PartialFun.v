@@ -159,8 +159,8 @@ Notation "∇ x , I ⇒ B" :=
 #[local] Notation "⟨ x ⟩" := (exist _ x _) (only parsing).
 #[local] Notation "⟨ x | h ⟩" := (exist _ x h).
 
-#[local] Notation "t .1" := (projT1 t) (at level 20).
-#[local] Notation "t .2" := (projT2 t) (at level 20).
+#[local] Notation "t .1" := (projT1 t).
+#[local] Notation "t .2" := (projT2 t).
 #[local] Notation "( x ; y )" := (existT _ x y).
 
 Section Lib.
@@ -958,7 +958,7 @@ Definition combined_orec (M : Type → Type) I `{CallTypes I} A B C :=
 
 #[export] Typeclasses Opaque combined_orec.
 
-Class OrecEffect M := { combined_monad : forall I `{_ : CallTypes I} A B, Monad (combined_orec M I A B) }. 
+Class OrecEffect M := { combined_monad : forall I `{_ : CallTypes I} A B, Monad (combined_orec M I A B) }.
 #[global] Hint Mode OrecEffect ! : typeclass_instances.
 
 
