@@ -121,7 +121,7 @@ Section Split.
   Let f := true.
   Let g := false.
 
-  Equations try_split : ∇ (n : nat), I ⇒ nat :=
+  Equations try_split : ∇ (n : nat), [ I ]⇒ nat :=
     try_split n :=
       m ← ext_call f n ;;
       ext_call g tt ;;
@@ -533,7 +533,7 @@ Inductive error :=
 
 #[local] Existing Instance combined_monad.
 
-Equations ediv : ∇ (p : nat * nat), exn error ♯ nat :=
+Equations ediv : ∇ (p : nat * nat), [exn error] nat :=
   ediv (n, 0) := raise DivisionByZero ;
   ediv (0, m) := ret 0 ;
   ediv (n, m) := S <*> rec (n - m, m).
@@ -615,15 +615,15 @@ Definition eff_call {A B C F} f `{PFun F f} (x : psrc f) `{OrecLift A B C (ptgt 
   orec PPFun A B C :=
   lift_call f x orec_lift.
 
-Equations test_ediv : ∇ (p : nat * nat), exn error ♯ bool :=
+Equations test_ediv : ∇ (p : nat * nat), [exn error] bool :=
   test_ediv (n, m) := q ← call ediv (n, m) ;; ret (q * m =? n).
 
 (* #[local]
-Hint Extern 0 (Monad (orec PPFun ?A ?B (ptgt ?f ?x))) => 
-  let R := eval cbn in (ptgt f x) in exact (_ : Monad (orec PPFun A B R)) 
+Hint Extern 0 (Monad (orec PPFun ?A ?B (ptgt ?f ?x))) =>
+  let R := eval cbn in (ptgt f x) in exact (_ : Monad (orec PPFun A B R))
   : typeclass_instances. *)
 
-Equations compare_div : ∇ (p : nat * nat), exn error ♯ bool :=
+Equations compare_div : ∇ (p : nat * nat), [exn error] bool :=
   compare_div (n, m) :=
     q ← eff_call ediv (n, m) ;;[combined_orec _ _ _ _]
     q' ← eff_call div (n, m) ;;

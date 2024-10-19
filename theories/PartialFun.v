@@ -151,7 +151,7 @@ Fixpoint _bind {I} `{CallTypes I} {A B C D} (c : orec I A B C) (f : C → orec I
 #[export] Typeclasses Opaque _bind.
 Opaque _bind.
 
-Notation "∇ x , I ⇒ B" :=
+Notation "∇ x , [ I ]⇒ B" :=
   (∀ x, orec I _ (λ x, B%type) B)
   (x binder, at level 200).
 
@@ -159,13 +159,13 @@ Notation "∇ x , I ⇒ B" :=
 #[local] Notation "⟨ x ⟩" := (exist _ x _) (only parsing).
 #[local] Notation "⟨ x | h ⟩" := (exist _ x h).
 
-#[local] Notation "t .1" := (projT1 t) (at level 20).
-#[local] Notation "t .2" := (projT2 t) (at level 20).
+#[local] Notation "t .1" := (projT1 t).
+#[local] Notation "t .2" := (projT2 t).
 #[local] Notation "( x ; y )" := (existT _ x y).
 
 Section Lib.
 
-  Context {I} `{CT : CallTypes I} `{!CallableProps CT} {A B} (f : ∇ (x : A), I ⇒ B x).
+  Context {I} `{CT : CallTypes I} `{!CallableProps CT} {A B} (f : ∇ (x : A), [I]⇒ B x).
 
   Inductive orec_graph {a} : orec I A B (B a) → B a → Prop :=
   | ret_graph :
@@ -907,7 +907,7 @@ Defined.
   CallableSplit _ _ CallablePropsPPFun.
 
 Notation "∇ x , B" :=
-  (∇ x, PPFun ⇒ B)
+  (∇ x, [PPFun]⇒ B)
   (x binder, at level 200).
 
 Notation "A ⇀ B" :=
@@ -915,7 +915,7 @@ Notation "A ⇀ B" :=
   (at level 199).
 
 (* We can provide an instance for all partial functions defined as above. *)
-#[local, refine] Instance pfun_gen A B {I} `{CT:CallTypes I, !CallableProps CT} (f : ∇ (x : A), I ⇒ B x) : PFun f := {|
+#[local, refine] Instance pfun_gen A B {I} `{CT:CallTypes I, !CallableProps CT} (f : ∇ (x : A), [I]⇒ B x) : PFun f := {|
   psrc := A ;
   ptgt := B ;
   pgraph := graph f ;
@@ -958,19 +958,21 @@ Definition combined_orec (M : Type → Type) I `{CallTypes I} A B C :=
 
 #[export] Typeclasses Opaque combined_orec.
 
-Class OrecEffect M := { combined_monad : forall I `{_ : CallTypes I} A B, Monad (combined_orec M I A B) }. 
+Class OrecEffect M := { combined_monad : forall I `{_ : CallTypes I} A B, Monad (combined_orec M I A B) }.
 #[global] Hint Mode OrecEffect ! : typeclass_instances.
 
 
 (* Typeclasses Opaque combined. *)
 
-Notation "∇ x , I ⇒ M ♯ B" :=
+Notation "∇ x , [ I ]⇒[ M ] B" :=
   (∀ x, combined_orec M I _ (λ x, M%function B%type) B)
   (x binder, at level 200).
 
-Notation "∇ x , M ♯ B" :=
-  (∀ x, combined_orec M PPFun _ (λ x, M%function B%type) B)
+Notation "∇ x , [ M ] B" := (∇ x, [PPFun]⇒[ M ] B)
+  (* (∀ x, combined_orec M PPFun _ (λ x, M%function B%type) B) *)
   (x binder, at level 200).
+
+
 
 (* Useful tactics *)
 
@@ -1011,7 +1013,7 @@ Module PFUnInstances.
 
   (* PFun instance for effectful partial functions *)
   #[export] Instance pfun_eff_gen
-    A B E `{Monad (combined_orec E PPFun A B)} (f : ∇ (x : A), E ♯ B x) : PFun f :=
+    A B E `{Monad (combined_orec E PPFun A B)} (f : ∇ (x : A), [ E ] B x) : PFun f :=
     pfun_gen A (λ x, E (B x)) f.
 
 End PFUnInstances.
