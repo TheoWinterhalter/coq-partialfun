@@ -261,6 +261,15 @@ Section Lib.
     all: econstructor ; eauto.
   Qed.
 
+  Lemma graphT_graph :
+    ∀ x y,
+      graphT x y →
+      graph x y.
+  Proof.
+    intros.
+    now apply orec_graphT_graph.
+  Qed.
+
   Lemma lt_preserves_domain :
     ∀ x y,
       domain x →
@@ -627,7 +636,8 @@ Section Lib.
     unfold defT. destruct def_pT. apply orec_graphT_graph. assumption.
   Qed.
 
-  Lemma orec_graph_graphT :
+
+  Lemma graph_graphT :
     ∀ x v,
       graph x v →
       graphT x v.
@@ -638,7 +648,7 @@ Section Lib.
     assert (v = v').
     { eapply orec_graph_functional.
       - eassumption.
-      - apply orec_graphT_graph. assumption.
+      - apply graphT_graph. assumption.
     }
     subst. assumption.
   Qed.
@@ -732,7 +742,7 @@ Section Lib.
   Fixpoint orec_ind_stepT a (pre : precondT) (post : postcondT) (o : orec I _ _ _) :=
     match o with
     | _ret v => post a v
-    | _rec x κ => pre x * ∀ v, post x v → orec_ind_stepT a pre post (κ v)
+    | _rec x κ => pre x * ∀ v, graph x v → post x v → orec_ind_stepT a pre post (κ v)
     | _call g x κ => ∀ v, cp_graph g x v → orec_ind_stepT a pre post (κ v)
     | undefined => True
     end%type.
@@ -754,7 +764,8 @@ Section Lib.
     - assumption.
     - destruct h as [hpy hv].
       apply ihκ. 2: assumption.
-      apply hv. apply ihy. 2: assumption.
+      apply hv. 1: now eapply graphT_graph.
+      apply ihy. 2: assumption.
       apply hind. assumption.
     - apply ihκ. 2: assumption.
       apply h. assumption.
@@ -767,7 +778,7 @@ Section Lib.
       graph x v →
       post x v.
   Proof.
-    intros pre post x v h hpre hgraph%orec_graph_graphT.
+    intros pre post x v h hpre hgraph%graph_graphT.
     eapply orec_graph_inst_rect_step.
     all: eauto.
   Qed.
