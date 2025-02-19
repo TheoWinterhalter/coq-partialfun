@@ -735,14 +735,15 @@ Section Lib.
   Qed.
 
   (* Same as funind but for Type *)
+  (* Note that the postcondition is dependent on the precondition *)
 
   Notation precondT := (A → Type).
-  Notation postcondT := (∀ x, B x → Type).
+  Notation postcondT := (λ pre, ∀ x, pre x → B x → Type).
 
-  Fixpoint orec_ind_stepT a (pre : precondT) (post : postcondT) (o : orec I _ _ _) :=
+  Fixpoint orec_ind_stepT a (pre : precondT) (post : postcondT pre) (o : orec I _ _ _) :=
     match o with
-    | _ret v => post a v
-    | _rec x κ => pre x * ∀ v, graph x v → post x v → orec_ind_stepT a pre post (κ v)
+    | _ret v => ∀ p, post a p v
+    | _rec x κ => { p : pre x & ∀ v, graph x v → post x p v → orec_ind_stepT a pre post (κ v) }
     | _call g x κ => ∀ v, cp_graph g x v → orec_ind_stepT a pre post (κ v)
     | undefined => True
     end%type.
@@ -754,31 +755,31 @@ Section Lib.
     ∀ pre post x y v,
       funrect pre post →
       orec_ind_stepT x pre post y →
-      pre x →
       orec_graphT y v →
-      post x v.
+      ∀ (p : pre x),
+      post x p v.
   Proof.
-    intros pre post x y v hind h hpre hgraph.
+    intros pre post x y v hind h hgraph hpre.
     induction hgraph as [w | x y κ v w hy ihy hκ ihκ | x i y κ v w hy hκ ihκ].
     all: cbn in *.
-    - assumption.
+    - auto.
     - destruct h as [hpy hv].
-      apply ihκ. 2: assumption.
+      apply ihκ.
       apply hv. 1: now eapply graphT_graph.
-      apply ihy. 2: assumption.
+      apply ihy.
       apply hind. assumption.
-    - apply ihκ. 2: assumption.
+    - apply ihκ.
       apply h. assumption.
   Qed.
 
   Lemma funrect_graph :
     ∀ pre post x v,
       funrect pre post →
-      pre x →
       graph x v →
-      post x v.
+      ∀ (p : pre x),
+      post x p v.
   Proof.
-    intros pre post x v h hpre hgraph%graph_graphT.
+    intros pre post x v h hgraph%graph_graphT hpre.
     eapply orec_graph_inst_rect_step.
     all: eauto.
   Qed.
@@ -788,11 +789,11 @@ Section Lib.
   Lemma funrect_fuel :
     ∀ pre post x n v,
       funrect pre post →
-      pre x →
       fueled n x = Success v →
-      post x v.
+      ∀ (p : pre x),
+      post x p v.
   Proof.
-    intros pre post x n v h hpre ?%fueled_graph_sound.
+    intros pre post x n v h ?%fueled_graph_sound hpre.
     eapply funrect_graph. all: eauto.
   Qed.
 
@@ -801,8 +802,8 @@ Section Lib.
   Lemma def_rect :
     ∀ pre post x h,
       funrect pre post →
-      pre x →
-      post x (def x h).
+      ∀ (p : pre x),
+      post x p (def x h).
   Proof.
     intros pre post x h ho hpre.
     pose proof def_graph_sound.
